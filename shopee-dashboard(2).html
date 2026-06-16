@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Shopee Sales Dashboard</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --shopee:   #ee4d2d;
+  --shopee-2: #ff6b4a;
+  --shopee-bg:#fff5f3;
+  --blue:     #1a73e8;
+  --green:    #1e8a4c;
+  --purple:   #6d28d9;
+  --amber:    #d97706;
+  --text:     #111827;
+  --sub:      #6b7280;
+  --border:   #e5e7eb;
+  --surface:  #ffffff;
+  --bg:       #f9fafb;
+  --shadow-s: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.04);
+  --shadow-m: 0 4px 16px rgba(0,0,0,.08);
+  --radius:   14px;
+}
+
+body {
+  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  font-size: 14px;
+}
+
+/* ─ Topbar ─────────────────────────────────────────── */
+#topbar {
+  position: sticky; top: 0; z-index: 200;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  height: 56px;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 24px;
+  box-shadow: var(--shadow-s);
+}
+
+.logo {
+  display: flex; align-items: center; gap: 10px;
+  font-weight: 700; font-size: 15px;
+}
+
+.logo-pill {
+  background: var(--shopee); color: #fff;
+  padding: 3px 9px; border-radius: 6px;
+  font-size: 12px; font-weight: 800; letter-spacing: .3px;
+}
+
+.topbar-right { display: flex; align-items: center; gap: 10px; }
+
+.dot { width: 8px; height: 8px; border-radius: 50%; background: #d1d5db; transition: background .3s; }
+.dot.ok  { background: #10b981; box-shadow: 0 0 0 3px #d1fae5; }
+.dot.err { background: var(--shopee); box-shadow: 0 0 0 3px #fee2e2; }
+
+#statusLabel { font-size: 12px; color: var(--sub); }
+
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 7px 15px; border-radius: 8px;
+  font-size: 13px; font-weight: 600;
+  border: none; cursor: pointer; transition: all .15s;
+}
+
+.btn-primary   { background: var(--shopee); color: #fff; }
+.btn-primary:hover { background: #d94429; }
+.btn-primary:disabled { background: #d1d5db; cursor: not-allowed; }
+
+.btn-ghost {
+  background: transparent; color: var(--sub);
+  border: 1.5px solid var(--border);
+}
+.btn-ghost:hover { background: var(--bg); color: var(--text); }
+
+/* ─ Setup Modal ──────────────────────────────────────── */
+#modal-bg {
+  position: fixed; inset: 0;
+  background: rgba(17,24,39,.55);
+  backdrop-filter: blur(5px);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 999;
+}
+#modal-bg.hidden { display: none; }
+
+.modal {
+  background: var(--surface);
+  border-radius: 20px;
+  padding: 32px;
+  width: 90%; max-width: 440px;
+  box-shadow: 0 25px 60px rgba(0,0,0,.22);
+}
+
+.modal-icon { font-size: 36px; margin-bottom: 14px; }
+.modal h2 { font-size: 20px; font-weight: 800; margin-bottom: 4px; }
+.modal-sub { color: var(--sub); font-size: 13px; margin-bottom: 24px; line-height: 1.5; }
+
+.field { margin-bottom: 14px; }
+.field label { display: block; font-size: 11px; font-weight: 700; color: var(--sub); text-transform: uppercase; letter-spacing: .6px; margin-bottom: 5px; }
+.field input, .field textarea {
+  width: 100%; padding: 9px 12px;
+  border: 1.5px solid var(--border); border-radius: 8px;
+  font-size: 13px; font-family: 'Courier New', monospace;
+  background: var(--bg); color: var(--text);
+  outline: none; transition: border-color .2s;
+}
+.field input:focus, .field textarea:focus { border-color: var(--shopee); background: #fff; }
+.field textarea { resize: vertical; min-height: 68px; }
+
+.modal-footer { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
+.modal-footer .btn { width: 100%; justify-content: center; }
+
+.n8n-hint {
+  background: #eff6ff; border-left: 3px solid var(--blue);
+  border-radius: 0 8px 8px 0;
+  padding: 10px 14px; font-size: 12px; color: #1e40af;
+  margin-bottom: 20px; line-height: 1.5;
+}
+.n8n-hint strong { display: block; margin-bottom: 3px; }
+.n8n-hint code { background: #dbeafe; padding: 1px 5px; border-radius: 4px; font-family: 'Courier New', monospace; }
+
+/* ─ Filter Bar ───────────────────────────────────────── */
+#filter-bar {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 24px;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+
+#filter-bar .label { font-size: 12px; font-weight: 700; color: var(--sub); white-space: nowrap; }
+
+.year-sel {
+  padding: 5px 10px; border-radius: 8px;
+  border: 1.5px solid var(--border);
+  font-size: 13px; background: var(--surface); color: var(--text);
+  outline: none; cursor: pointer;
+}
+
+.mth {
+  padding: 5px 12px; border-radius: 20px;
+  border: 1.5px solid var(--border);
+  background: var(--surface); color: var(--sub);
+  font-size: 12px; font-weight: 600; cursor: pointer;
+  transition: all .15s;
+}
+.mth:hover { border-color: var(--shopee); color: var(--shopee); }
+.mth.on { background: var(--shopee); border-color: var(--shopee); color: #fff; }
+
+/* ─ Main Content ─────────────────────────────────────── */
+#main { max-width: 1340px; margin: 0 auto; padding: 22px 24px 40px; }
+
+/* ─ KPI Grid ─────────────────────────────────────────── */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-bottom: 18px;
+}
+
+.kpi {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  box-shadow: var(--shadow-s);
+  position: relative; overflow: hidden;
+  transition: transform .2s, box-shadow .2s;
+}
+.kpi:hover { transform: translateY(-2px); box-shadow: var(--shadow-m); }
+
+.kpi::after {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0;
+  height: 3px; border-radius: var(--radius) var(--radius) 0 0;
+}
+.kpi.c-shopee::after  { background: var(--shopee); }
+.kpi.c-blue::after    { background: var(--blue); }
+.kpi.c-green::after   { background: var(--green); }
+.kpi.c-purple::after  { background: var(--purple); }
+
+.kpi-emoji { font-size: 24px; margin-bottom: 10px; }
+.kpi-lbl { font-size: 11px; font-weight: 700; color: var(--sub); text-transform: uppercase; letter-spacing: .6px; }
+.kpi-val {
+  font-size: 26px; font-weight: 800; margin: 4px 0 6px;
+  font-variant-numeric: tabular-nums;
+}
+.kpi.c-shopee .kpi-val  { color: var(--shopee); }
+.kpi.c-blue .kpi-val    { color: var(--blue); }
+.kpi.c-green .kpi-val   { color: var(--green); }
+.kpi.c-purple .kpi-val  { color: var(--purple); }
+.kpi-note { font-size: 11px; color: var(--sub); }
+
+/* ─ Charts ───────────────────────────────────────────── */
+.charts-row {
+  display: grid; grid-template-columns: 7fr 3fr;
+  gap: 14px; margin-bottom: 18px;
+}
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 22px;
+  box-shadow: var(--shadow-s);
+}
+
+.card-title { font-size: 13px; font-weight: 700; margin-bottom: 2px; }
+.card-sub   { font-size: 12px; color: var(--sub); margin-bottom: 16px; }
+
+.chart-wrap { position: relative; height: 230px; }
+
+/* ─ Bottom Grid ──────────────────────────────────────── */
+.bottom-row {
+  display: grid; grid-template-columns: 1fr 1fr;
+  gap: 14px; margin-bottom: 18px;
+}
+
+.rank-list { list-style: none; }
+.rank-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 0; border-bottom: 1px solid #f3f4f6;
+}
+.rank-row:last-child { border-bottom: none; }
+
+.rn {
+  width: 26px; height: 26px; border-radius: 7px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 800; flex-shrink: 0;
+}
+.rn-1 { background: #fef3c7; color: #92400e; }
+.rn-2 { background: #f3f4f6; color: #374151; }
+.rn-3 { background: #fde8d8; color: #9a3412; }
+.rn-x { background: #f9fafb; color: var(--sub); }
+
+.ri { flex: 1; min-width: 0; }
+.ri-name { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.ri-sku  { font-size: 11px; color: var(--sub); margin-top: 1px; }
+
+.rb { width: 60px; }
+.rb-track { height: 3px; background: #f3f4f6; border-radius: 2px; }
+.rb-fill  { height: 100%; border-radius: 2px; background: var(--shopee); transition: width .6s ease; }
+
+.rv { font-size: 12px; font-weight: 700; white-space: nowrap; }
+
+/* ─ Orders Table ─────────────────────────────────────── */
+.tbl-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+thead th {
+  text-align: left; font-size: 11px; font-weight: 700;
+  color: var(--sub); text-transform: uppercase; letter-spacing: .5px;
+  padding: 10px 14px; background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+thead th:first-child { border-radius: 8px 0 0 8px; }
+thead th:last-child  { border-radius: 0 8px 8px 0; }
+tbody td { padding: 11px 14px; font-size: 13px; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
+tbody tr:last-child td { border-bottom: none; }
+tbody tr:hover td { background: #fafafa; }
+
+.order-sn { font-family: 'Courier New', monospace; font-size: 11px; color: var(--sub); }
+.pname { font-weight: 600; }
+.psku  { font-size: 11px; color: var(--sub); margin-top: 1px; }
+
+.badge {
+  display: inline-block; padding: 2px 8px;
+  border-radius: 10px; font-size: 11px; font-weight: 600;
+}
+.b-done    { background: #d1fae5; color: #065f46; }
+.b-ship    { background: #dbeafe; color: #1e40af; }
+.b-proc    { background: #fef3c7; color: #92400e; }
+.b-cancel  { background: #fee2e2; color: #991b1b; }
+.b-default { background: #f3f4f6; color: var(--sub); }
+
+.tbl-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
+.empty-msg { text-align: center; padding: 48px; color: var(--sub); }
+.empty-msg .eico { font-size: 40px; margin-bottom: 8px; }
+
+/* ─ Loading ──────────────────────────────────────────── */
+.spinner {
+  width: 32px; height: 32px;
+  border: 3px solid #f3f4f6;
+  border-top-color: var(--shopee);
+  border-radius: 50%;
+  animation: spin .7s linear infinite;
+  margin: 0 auto 12px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.loading-box { text-align: center; padding: 48px; color: var(--sub); font-size: 13px; }
+.loading-icon { animation: spin .7s linear infinite; display: inline-block; font-size: 22px; }
+
+/* ─ Toast ────────────────────────────────────────────── */
+#toast {
+  position: fixed; bottom: 22px; right: 22px;
+  padding: 11px 18px; border-radius: 10px;
+  font-size: 13px; font-weight: 600; color: #fff;
+  opacity: 0; transform: translateY(6px);
+  transition: all .25s; pointer-events: none; z-index: 9999;
+}
+#toast.show { opacity: 1; transform: none; }
+#toast.t-ok  { background: #10b981; }
+#toast.t-err { background: #ef4444; }
+#toast.t-inf { background: var(--blue); }
+
+/* ─ Responsive ───────────────────────────────────────── */
+@media (max-width: 900px) {
+  .kpi-grid    { grid-template-columns: repeat(2,1fr); }
+  .charts-row  { grid-template-columns: 1fr; }
+  .bottom-row  { grid-template-columns: 1fr; }
+  #main        { padding: 16px; }
+}
+</style>
+</head>
+<body>
+
+<!-- ─── Modal Setup ─────────────────────────────────── -->
+<div id="modal-bg">
+  <div class="modal">
+    <div class="modal-icon">🛒</div>
+    <h2>Setup Shopee Dashboard</h2>
+    <p class="modal-sub">Masukkan credentials Shopee Open API. Data disimpan lokal di browser Anda.</p>
+
+    <div class="n8n-hint">
+      <strong>🔌 Menggunakan n8n sebagai backend</strong>
+      Pastikan n8n sudah berjalan di <code>localhost:5678</code> dan workflow sudah di-import & aktif.
+    </div>
+
+    <div class="field">
+      <label>n8n Base URL</label>
+      <input id="cfg-n8n" value="http://localhost:5678" placeholder="http://localhost:5678">
+    </div>
+    <div class="field">
+      <label>Partner ID</label>
+      <input id="cfg-pid" value="2036238">
+    </div>
+    <div class="field">
+      <label>Partner Key</label>
+      <input id="cfg-pkey" value="shpk6d6b564c4a50466d57574349504647474a43576a48567556555465755a4b">
+    </div>
+    <div class="field">
+      <label>Shop ID</label>
+      <input id="cfg-sid" value="1670690811">
+    </div>
+    <div class="field">
+      <label>Access Token</label>
+      <textarea id="cfg-token" placeholder="Dapatkan token via tab Auth di bawah, atau paste di sini"></textarea>
+    </div>
+
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="saveConfig()">✅ Simpan & Muat Data</button>
+      <button class="btn btn-ghost" onclick="openAuthTab()">🔑 Belum punya token? Generate dulu</button>
+      <button class="btn btn-ghost" onclick="loadDemo()">📊 Coba dengan Data Demo</button>
+    </div>
+  </div>
+</div>
+
+<!-- ─── Topbar ──────────────────────────────────────── -->
+<div id="topbar">
+  <div class="logo">
+    <span class="logo-pill">SHOPEE</span>
+    Sales Dashboard
+  </div>
+  <div class="topbar-right">
+    <div class="dot" id="dot"></div>
+    <span id="statusLabel">Belum terhubung</span>
+    <button class="btn btn-primary" id="refreshBtn" onclick="loadData()">🔄 Refresh</button>
+    <button class="btn btn-ghost" onclick="openSetup()">⚙️</button>
+  </div>
+</div>
+
+<!-- ─── Filter Bar ──────────────────────────────────── -->
+<div id="filter-bar">
+  <span class="label">Periode:</span>
+  <select class="year-sel" id="yearSel" onchange="onYearChange()">
+    <option value="2025">2025</option><option value="2024">2024</option><option value="2023">2023</option>
+  </select>
+  <button class="mth on" data-m="all"  onclick="setMonth('all',this)">Semua</button>
+  <button class="mth"    data-m="1"    onclick="setMonth(1,this)">Jan</button>
+  <button class="mth"    data-m="2"    onclick="setMonth(2,this)">Feb</button>
+  <button class="mth"    data-m="3"    onclick="setMonth(3,this)">Mar</button>
+  <button class="mth"    data-m="4"    onclick="setMonth(4,this)">Apr</button>
+  <button class="mth"    data-m="5"    onclick="setMonth(5,this)">Mei</button>
+  <button class="mth"    data-m="6"    onclick="setMonth(6,this)">Jun</button>
+  <button class="mth"    data-m="7"    onclick="setMonth(7,this)">Jul</button>
+  <button class="mth"    data-m="8"    onclick="setMonth(8,this)">Agu</button>
+  <button class="mth"    data-m="9"    onclick="setMonth(9,this)">Sep</button>
+  <button class="mth"    data-m="10"   onclick="setMonth(10,this)">Okt</button>
+  <button class="mth"    data-m="11"   onclick="setMonth(11,this)">Nov</button>
+  <button class="mth"    data-m="12"   onclick="setMonth(12,this)">Des</button>
+</div>
+
+<!-- ─── Main ────────────────────────────────────────── -->
+<div id="main">
+
+  <!-- KPI -->
+  <div class="kpi-grid">
+    <div class="kpi c-shopee">
+      <div class="kpi-emoji">💰</div>
+      <div class="kpi-lbl">Total Omset</div>
+      <div class="kpi-val" id="kOmset">—</div>
+      <div class="kpi-note" id="kOmsetNote">—</div>
+    </div>
+    <div class="kpi c-blue">
+      <div class="kpi-emoji">🧾</div>
+      <div class="kpi-lbl">Total Pesanan</div>
+      <div class="kpi-val" id="kOrders">—</div>
+      <div class="kpi-note" id="kOrdersNote">Completed / Shipped</div>
+    </div>
+    <div class="kpi c-green">
+      <div class="kpi-emoji">📦</div>
+      <div class="kpi-lbl">Produk Unik</div>
+      <div class="kpi-val" id="kProducts">—</div>
+      <div class="kpi-note" id="kProductsNote">Jenis produk terjual</div>
+    </div>
+    <div class="kpi c-purple">
+      <div class="kpi-emoji">🔢</div>
+      <div class="kpi-lbl">Total Quantity</div>
+      <div class="kpi-val" id="kQty">—</div>
+      <div class="kpi-note" id="kQtyNote">Total item terjual</div>
+    </div>
+  </div>
+
+  <!-- Charts -->
+  <div class="charts-row">
+    <div class="card">
+      <div class="card-title">📈 Tren Omset</div>
+      <div class="card-sub" id="chartSubOmset">Revenue per bulan</div>
+      <div class="chart-wrap"><canvas id="chartOmset"></canvas></div>
+    </div>
+    <div class="card">
+      <div class="card-title">🥧 Status Pesanan</div>
+      <div class="card-sub">Distribusi semua order</div>
+      <div class="chart-wrap"><canvas id="chartStatus"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Top Products -->
+  <div class="bottom-row">
+    <div class="card">
+      <div class="card-title">🏆 Top 8 — Omset</div>
+      <div class="card-sub">Produk dengan revenue tertinggi</div>
+      <ul class="rank-list" id="topRevList"><li class="empty-msg"><div class="eico">📭</div>Belum ada data</li></ul>
+    </div>
+    <div class="card">
+      <div class="card-title">📦 Top 8 — Quantity</div>
+      <div class="card-sub">Produk paling banyak terjual</div>
+      <ul class="rank-list" id="topQtyList"><li class="empty-msg"><div class="eico">📭</div>Belum ada data</li></ul>
+    </div>
+  </div>
+
+  <!-- Orders Table -->
+  <div class="card">
+    <div class="tbl-header">
+      <div>
+        <div class="card-title">📋 Daftar Pesanan</div>
+        <div class="card-sub" id="tblSub">—</div>
+      </div>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-ghost" style="font-size:12px;" onclick="exportCSV()">📥 Export CSV</button>
+      </div>
+    </div>
+    <div id="tblWrap" class="tbl-wrap">
+      <div class="empty-msg"><div class="eico">📭</div>Klik Refresh untuk muat data</div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+// ── State ─────────────────────────────────────────────────────────
+const S = {
+  cfg: null,
+  raw: null,          // raw response from n8n
+  month: 'all',
+  year: new Date().getFullYear(),
+  charts: {},
+  isDemo: false,
+};
+
+const MONTHS = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+
+// ── Boot ──────────────────────────────────────────────────────────
+window.addEventListener('load', () => {
+  document.getElementById('yearSel').value = S.year;
+  const saved = localStorage.getItem('shopee_cfg_v2');
+  if (saved) {
+    try {
+      S.cfg = JSON.parse(saved);
+      fillModal();
+      closeSetup();
+      loadData();
+    } catch(e) {}
+  }
+  initCharts();
+});
+
+// ── Config ────────────────────────────────────────────────────────
+function fillModal() {
+  if (!S.cfg) return;
+  document.getElementById('cfg-n8n').value   = S.cfg.n8n   || 'http://localhost:5678';
+  document.getElementById('cfg-pid').value   = S.cfg.pid   || '';
+  document.getElementById('cfg-pkey').value  = S.cfg.pkey  || '';
+  document.getElementById('cfg-sid').value   = S.cfg.sid   || '';
+  document.getElementById('cfg-token').value = S.cfg.token || '';
+}
+
+function saveConfig() {
+  const cfg = {
+    n8n:   document.getElementById('cfg-n8n').value.trim().replace(/\/$/, ''),
+    pid:   document.getElementById('cfg-pid').value.trim(),
+    pkey:  document.getElementById('cfg-pkey').value.trim(),
+    sid:   document.getElementById('cfg-sid').value.trim(),
+    token: document.getElementById('cfg-token').value.trim(),
+  };
+  if (!cfg.pid || !cfg.pkey || !cfg.sid || !cfg.token) {
+    toast('Semua field wajib diisi kecuali n8n URL', 'err'); return;
+  }
+  localStorage.setItem('shopee_cfg_v2', JSON.stringify(cfg));
+  S.cfg = cfg; S.isDemo = false;
+  closeSetup();
+  loadData();
+}
+
+function openSetup()  { document.getElementById('modal-bg').classList.remove('hidden'); }
+function closeSetup() { document.getElementById('modal-bg').classList.add('hidden'); }
+
+function openAuthTab() {
+  // Buka auth URL melalui n8n
+  if (!S.cfg?.n8n || !S.cfg?.pid || !S.cfg?.pkey) {
+    toast('Isi n8n URL, Partner ID, Partner Key dulu', 'err'); return;
+  }
+  const n8nUrl = `${S.cfg.n8n}/webhook/shopee-auth-url`;
+  fetch(n8nUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ partner_id: S.cfg.pid, partner_key: S.cfg.pkey, redirect: 'https://localhost' })
+  })
+  .then(r => r.json())
+  .then(d => {
+    if (d.auth_url) { window.open(d.auth_url, '_blank'); toast('Halaman login Shopee dibuka', 'inf'); }
+    else toast('Gagal generate auth URL: ' + (d.message || JSON.stringify(d)), 'err');
+  })
+  .catch(e => toast('n8n tidak bisa dihubungi: ' + e.message, 'err'));
+}
+
+// ── Filter ────────────────────────────────────────────────────────
+function setMonth(m, btn) {
+  S.month = m;
+  document.querySelectorAll('.mth').forEach(b => b.classList.remove('on'));
+  btn.classList.add('on');
+  if (S.raw) renderAll(S.raw);
+}
+
+function onYearChange() {
+  S.year = parseInt(document.getElementById('yearSel').value);
+  loadData();
+}
+
+function timeRange() {
+  const y = S.year;
+  if (S.month === 'all') {
+    return {
+      from: Math.floor(new Date(`${y}-01-01`).getTime() / 1000),
+      to:   Math.floor(new Date(`${y}-12-31T23:59:59`).getTime() / 1000)
+    };
+  }
+  const m = String(S.month).padStart(2, '0');
+  const last = new Date(y, S.month, 0).getDate();
+  return {
+    from: Math.floor(new Date(`${y}-${m}-01`).getTime() / 1000),
+    to:   Math.floor(new Date(`${y}-${m}-${last}T23:59:59`).getTime() / 1000)
+  };
+}
+
+// ── Fetch via n8n ─────────────────────────────────────────────────
+async function loadData() {
+  if (S.isDemo) { renderAll(S.raw); return; }
+  if (!S.cfg) { openSetup(); return; }
+
+  setSyncing(true); setStatus('loading');
+
+  const { from, to } = timeRange();
+
+  try {
+    const res = await fetch(`${S.cfg.n8n}/webhook/shopee-orders`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        partner_id:   S.cfg.pid,
+        partner_key:  S.cfg.pkey,
+        shop_id:      S.cfg.sid,
+        access_token: S.cfg.token,
+        time_from:    from,
+        time_to:      to,
+      })
+    });
+
+    if (!res.ok) throw new Error(`HTTP ${res.status} dari n8n`);
+    const data = await res.json();
+
+    if (!data.success) throw new Error(data.message || 'Error dari n8n/Shopee');
+
+    S.raw = data;
+    renderAll(data);
+    setStatus('ok');
+    toast(`✅ ${data.orders?.length || 0} pesanan dimuat`, 'ok');
+  } catch(e) {
+    setStatus('err');
+    toast('⚠️ ' + e.message, 'err');
+    console.error(e);
+  }
+
+  setSyncing(false);
+}
+
+// ── Render ────────────────────────────────────────────────────────
+function renderAll(data) {
+  if (!data) return;
+
+  // Filter data by month if needed
+  let orders = data.orders || [];
+  let monthly = data.monthly || [];
+
+  if (S.month !== 'all') {
+    const monthKey = `${S.year}-${String(S.month).padStart(2,'0')}`;
+    orders = orders.filter(o => {
+      const d = new Date(o.create_time * 1000);
+      return d.getFullYear() === S.year && (d.getMonth()+1) === parseInt(S.month);
+    });
+    monthly = monthly.filter(m => m.month === monthKey);
+  }
+
+  // Recalculate totals from filtered orders
+  let omset = 0, orderCount = 0, qty = 0;
+  const prodMap = {};
+  const statusCount = {};
+
+  orders.forEach(o => {
+    const isGood = ['COMPLETED','SHIPPED','TO_CONFIRM_RECEIVE'].includes(o.order_status);
+    statusCount[o.order_status] = (statusCount[o.order_status]||0)+1;
+    if (!isGood) return;
+    omset += parseFloat(o.total_amount || 0);
+    orderCount++;
+    (o.items || []).forEach(it => {
+      const q = it.qty || 1;
+      const p = parseFloat(it.price || 0);
+      qty += q;
+      if (!prodMap[it.name]) prodMap[it.name] = { name: it.name, sku: it.sku||'-', qty:0, revenue:0 };
+      prodMap[it.name].qty     += q;
+      prodMap[it.name].revenue += q * p;
+    });
+  });
+
+  const products = Object.keys(prodMap).length;
+
+  // KPI
+  document.getElementById('kOmset').textContent    = fmtRp(omset);
+  document.getElementById('kOrders').textContent   = orderCount.toLocaleString('id');
+  document.getElementById('kProducts').textContent = products.toLocaleString('id');
+  document.getElementById('kQty').textContent      = qty.toLocaleString('id');
+
+  const period = S.month === 'all' ? `Tahun ${S.year}` : `${MONTHS[S.month-1]} ${S.year}`;
+  document.getElementById('kOmsetNote').textContent = period;
+
+  // Charts
+  renderOmsetChart(monthly, orders);
+  renderStatusChart(statusCount);
+
+  // Top products
+  const byRev = Object.values(prodMap).sort((a,b)=>b.revenue-a.revenue).slice(0,8);
+  const byQty = Object.values(prodMap).sort((a,b)=>b.qty-a.qty).slice(0,8);
+  renderRankList('topRevList', byRev, 'revenue', fmtRp);
+  renderRankList('topQtyList', byQty, 'qty', v => v.toLocaleString('id') + ' pcs');
+
+  // Table
+  document.getElementById('tblSub').textContent = `${orders.length} pesanan · ${period}`;
+  renderTable(orders);
+}
+
+// ── Charts ────────────────────────────────────────────────────────
+function initCharts() {
+  S.charts.omset = new Chart(document.getElementById('chartOmset').getContext('2d'), {
+    type: 'bar',
+    data: { labels: [], datasets: [] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { ticks: { callback: v => fmtRpShort(v), font: { size: 11 } }, grid: { color: '#f3f4f6' } },
+        x: { ticks: { font: { size: 11 } }, grid: { display: false } }
+      }
+    }
+  });
+
+  S.charts.status = new Chart(document.getElementById('chartStatus').getContext('2d'), {
+    type: 'doughnut',
+    data: { labels: [], datasets: [] },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      cutout: '68%',
+      plugins: { legend: { position: 'bottom', labels: { font: { size: 11 }, padding: 10, boxWidth: 12 } } }
+    }
+  });
+}
+
+function renderOmsetChart(monthly, orders) {
+  const ch = S.charts.omset;
+  if (S.month === 'all') {
+    // Monthly bars
+    const vals = Array(12).fill(0);
+    monthly.forEach(m => {
+      const idx = parseInt(m.month.split('-')[1]) - 1;
+      vals[idx] = m.omset;
+    });
+    const max = Math.max(...vals);
+    ch.data.labels = MONTHS;
+    ch.data.datasets = [{
+      data: vals,
+      backgroundColor: vals.map(v => v === max ? '#ee4d2d' : '#fecaca'),
+      borderRadius: 6, borderSkipped: false
+    }];
+    document.getElementById('chartSubOmset').textContent = `Revenue per bulan — Tahun ${S.year}`;
+  } else {
+    // Daily bars
+    const daysInMonth = new Date(S.year, S.month, 0).getDate();
+    const vals = Array(daysInMonth).fill(0);
+    orders.forEach(o => {
+      if (!['COMPLETED','SHIPPED','TO_CONFIRM_RECEIVE'].includes(o.order_status)) return;
+      const d = new Date(o.create_time * 1000).getDate();
+      vals[d-1] += parseFloat(o.total_amount || 0);
+    });
+    ch.data.labels = Array.from({length: daysInMonth}, (_,i) => i+1);
+    ch.data.datasets = [{
+      data: vals,
+      backgroundColor: '#fecaca',
+      borderColor: '#ee4d2d', borderWidth: 1.5,
+      borderRadius: 4, borderSkipped: false
+    }];
+    document.getElementById('chartSubOmset').textContent = `Revenue per hari — ${MONTHS[S.month-1]} ${S.year}`;
+  }
+  ch.update();
+}
+
+function renderStatusChart(statusCount) {
+  const colors = {
+    COMPLETED:'#10b981', SHIPPED:'#3b82f6', TO_CONFIRM_RECEIVE:'#0d9488',
+    PROCESSING:'#f59e0b', IN_CANCEL:'#f97316', CANCELLED:'#ef4444',
+    UNPAID:'#8b5cf6', UNKNOWN:'#9ca3af'
+  };
+  const labels = Object.keys(statusCount);
+  S.charts.status.data.labels   = labels.map(l => l.replace(/_/g,' '));
+  S.charts.status.data.datasets = [{
+    data: labels.map(l => statusCount[l]),
+    backgroundColor: labels.map(l => colors[l] || '#9ca3af'),
+    borderWidth: 2, borderColor: '#fff'
+  }];
+  S.charts.status.update();
+}
+
+// ── Rank Lists ────────────────────────────────────────────────────
+function renderRankList(elId, items, valueKey, fmt) {
+  const el = document.getElementById(elId);
+  if (!items.length) {
+    el.innerHTML = '<li class="empty-msg"><div class="eico">📭</div>Belum ada data</li>'; return;
+  }
+  const max = items[0][valueKey] || 1;
+  el.innerHTML = items.map((p, i) => {
+    const rnCls = ['rn-1','rn-2','rn-3'][i] || 'rn-x';
+    const pct = ((p[valueKey]/max)*100).toFixed(0);
+    return `
+      <li class="rank-row">
+        <div class="rn ${rnCls}">${i+1}</div>
+        <div class="ri">
+          <div class="ri-name">${p.name}</div>
+          <div class="ri-sku">${p.sku}</div>
+        </div>
+        <div class="rb"><div class="rb-track"><div class="rb-fill" style="width:${pct}%"></div></div></div>
+        <div class="rv">${fmt(p[valueKey])}</div>
+      </li>`;
+  }).join('');
+}
+
+// ── Table ─────────────────────────────────────────────────────────
+function renderTable(orders) {
+  const el = document.getElementById('tblWrap');
+  if (!orders.length) {
+    el.innerHTML = '<div class="empty-msg"><div class="eico">📭</div>Tidak ada pesanan di periode ini</div>'; return;
+  }
+  const badgeClass = s => ({
+    COMPLETED:'b-done', SHIPPED:'b-ship', TO_CONFIRM_RECEIVE:'b-ship',
+    PROCESSING:'b-proc', IN_CANCEL:'b-cancel', CANCELLED:'b-cancel'
+  }[s] || 'b-default');
+
+  const rows = orders.slice(0, 100).map(o => {
+    const dt = new Date(o.create_time * 1000).toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'});
+    const first = o.items?.[0] || {};
+    const tqty = (o.items || []).reduce((s,i)=>s+(i.qty||1),0);
+    const extra = (o.items||[]).length > 1 ? `<div style="font-size:10px;color:var(--sub);">+${o.items.length-1} lainnya</div>` : '';
+    return `<tr>
+      <td><div class="order-sn">${o.order_sn}</div><div style="font-size:11px;color:var(--sub);margin-top:2px;">${dt}</div></td>
+      <td><div class="pname">${first.name||'-'}</div><div class="psku">${first.sku||'-'}</div>${extra}</td>
+      <td style="text-align:center;font-weight:700;">${tqty}</td>
+      <td><span class="badge ${badgeClass(o.order_status)}">${(o.order_status||'-').replace(/_/g,' ')}</span></td>
+      <td style="font-weight:700;">${fmtRp(o.total_amount||0)}</td>
+    </tr>`;
+  }).join('');
+
+  el.innerHTML = `<table>
+    <thead><tr>
+      <th>Order / Tanggal</th><th>Produk</th>
+      <th style="text-align:center">Qty</th><th>Status</th><th>Total</th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>
+  ${orders.length > 100 ? `<div style="text-align:center;padding:12px;font-size:12px;color:var(--sub);">Menampilkan 100 dari ${orders.length} pesanan</div>` : ''}`;
+}
+
+// ── Export CSV ────────────────────────────────────────────────────
+function exportCSV() {
+  const orders = S.raw?.orders || [];
+  if (!orders.length) { toast('Tidak ada data', 'err'); return; }
+  const head = ['Order SN','Tanggal','Produk','SKU','Qty','Status','Total (Rp)'];
+  const rows = [];
+  orders.forEach(o => {
+    const dt = new Date(o.create_time*1000).toLocaleDateString('id-ID');
+    (o.items||[{name:'-',sku:'-',qty:1}]).forEach(it => {
+      rows.push([o.order_sn, dt, it.name||'-', it.sku||'-', it.qty||1, o.order_status||'-', o.total_amount||0]);
+    });
+  });
+  const csv = [head, ...rows].map(r => r.map(v=>`"${v}"`).join(',')).join('\n');
+  const a = Object.assign(document.createElement('a'), {
+    href: URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'})),
+    download: `shopee_${S.year}_${S.month}.csv`
+  });
+  a.click();
+  toast('✅ CSV didownload', 'ok');
+}
+
+// ── Demo Data ─────────────────────────────────────────────────────
+function loadDemo() {
+  S.isDemo = true; closeSetup();
+  const prods = [
+    {name:'Sepatu Sneakers Premium',sku:'SS-001',price:285000},
+    {name:'Tas Ransel Canvas',      sku:'TR-002',price:195000},
+    {name:'Kaos Polos Cotton',      sku:'KP-003',price:75000},
+    {name:'Celana Jeans Slim',      sku:'CJ-004',price:245000},
+    {name:'Jaket Hoodie Fleece',    sku:'JH-005',price:320000},
+    {name:'Sandal Kulit Casual',    sku:'SK-006',price:145000},
+    {name:'Kemeja Flanel',          sku:'KF-007',price:185000},
+    {name:'Topi Baseball',          sku:'TB-008',price:65000},
+  ];
+  const statuses = ['COMPLETED','COMPLETED','COMPLETED','SHIPPED','SHIPPED','PROCESSING','CANCELLED'];
+  const orders = [];
+  const y = S.year;
+  for (let m=1;m<=12;m++) {
+    const n = Math.floor(Math.random()*40)+20;
+    for (let o=0;o<n;o++) {
+      const day = Math.floor(Math.random()*28)+1;
+      const date = new Date(y,m-1,day);
+      const prod = prods[Math.floor(Math.random()*prods.length)];
+      const qty  = Math.floor(Math.random()*3)+1;
+      const st   = statuses[Math.floor(Math.random()*statuses.length)];
+      orders.push({
+        order_sn: `DEMO${y}${String(m).padStart(2,'0')}${String(o).padStart(4,'0')}`,
+        create_time: Math.floor(date.getTime()/1000),
+        order_status: st,
+        total_amount: prod.price * qty,
+        items: [{ name:prod.name, sku:prod.sku, qty, price:prod.price }]
+      });
+    }
+  }
+
+  // Pre-aggregate monthly
+  const mmap = {};
+  orders.forEach(o => {
+    const d = new Date(o.create_time*1000);
+    const mk = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    if (!mmap[mk]) mmap[mk] = { month:mk, omset:0, orders:0, quantity:0, products:new Set() };
+    if (['COMPLETED','SHIPPED'].includes(o.order_status)) {
+      mmap[mk].omset += o.total_amount;
+      mmap[mk].orders++;
+      o.items.forEach(it => { mmap[mk].quantity += it.qty; mmap[mk].products.add(it.name); });
+    }
+  });
+  const monthly = Object.values(mmap).map(m=>({...m,products:m.products.size})).sort((a,b)=>a.month.localeCompare(b.month));
+
+  S.raw = { success:true, orders, monthly };
+  setStatus('ok');
+  renderAll(S.raw);
+  toast('📊 Data demo dimuat', 'inf');
+}
+
+// ── Helpers ───────────────────────────────────────────────────────
+function fmtRp(n) {
+  n = parseFloat(n)||0;
+  if (n>=1e9) return 'Rp '+(n/1e9).toFixed(1)+'M';
+  if (n>=1e6) return 'Rp '+(n/1e6).toFixed(1)+'jt';
+  if (n>=1e3) return 'Rp '+(n/1e3).toFixed(0)+'rb';
+  return 'Rp '+n.toFixed(0);
+}
+function fmtRpShort(n) {
+  if (n>=1e9) return (n/1e9).toFixed(1)+'M';
+  if (n>=1e6) return (n/1e6).toFixed(1)+'jt';
+  if (n>=1e3) return (n/1e3).toFixed(0)+'rb';
+  return n;
+}
+
+function setSyncing(on) {
+  const btn = document.getElementById('refreshBtn');
+  btn.disabled = on;
+  btn.innerHTML = on ? '<span style="display:inline-block;animation:spin .7s linear infinite">⏳</span> Memuat…' : '🔄 Refresh';
+}
+
+function setStatus(s) {
+  const dot = document.getElementById('dot');
+  const lbl = document.getElementById('statusLabel');
+  dot.className = 'dot' + (s==='ok'?' ok':s==='err'?' err':'');
+  lbl.textContent = s==='ok' ? 'Terhubung' : s==='err' ? 'Gagal' : 'Memuat…';
+}
+
+function toast(msg, type='inf') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = `toast show t-${type}`;
+  clearTimeout(el._t);
+  el._t = setTimeout(() => el.classList.remove('show'), 3000);
+}
+</script>
+</body>
+</html>
