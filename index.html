@@ -585,23 +585,44 @@ function timeRange() {
 
 // ── Fetch via n8n ─────────────────────────────────────────────────
 async function fetchChunk(from, to) {
-  const res = await fetch(`${S.cfg.n8n}/webhook/shopee-orders`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      partner_id:   S.cfg.pid,
-      partner_key:  S.cfg.pkey,
-      shop_id:      S.cfg.sid,
-      access_token: S.cfg.token,
-      time_from:    from,
-      time_to:      to,
+  let allOrders = [];
+  let cursor = '';
+  let page = 0;
+
+  while (true) {
+    page++;
+    const reqBody = {
+      partner_id:       S.cfg.pid,
+      partner_key:      S.cfg.pkey,
+      shop_id:          S.cfg.sid,
+      access_token:     S.cfg.token,
+      time_from:        from,
+      time_to:          to,
       time_range_field: 'create_time'
-    })
-  });
-  if (!res.ok) throw new Error(`HTTP ${res.status} dari n8n`);
-  const data = await res.json();
-  if (!data.success) throw new Error(data.message || 'Error dari Shopee');
-  return data;
+    };
+    if (cursor) reqBody.cursor = cursor;
+
+    const res = await fetch(`${S.cfg.n8n}/webhook/shopee-orders`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(reqBody)
+    });
+
+    if (!res.ok) throw new Error(`HTTP ${res.status} dari n8n`);
+    const data = await res.json();
+    if (!data.success) throw new Error(data.message || 'Error dari Shopee');
+
+    if (data.orders?.length) allOrders.push(...data.orders);
+
+    if (data.hasMore && data.nextCursor) {
+      cursor = data.nextCursor;
+    } else {
+      break;
+    }
+    if (page >= 20) break; // safety limit
+  }
+
+  return { success: true, orders: allOrders };
 }
 
 async function loadData() {
@@ -658,7 +679,7 @@ async function loadData() {
           statusCount[s] = (statusCount[s] || 0) + 1;
 
           // Monthly + product (hanya completed/shipped)
-          const isGood = ['COMPLETED','SHIPPED','TO_CONFIRM_RECEIVE'].includes(o.order_status);
+          const isGood = ['COMPLETED','SHIPPED','TO_CONFIRM_RECEIVE','READY_TO_SHIP','PROCESSED','IN_CANCEL'].includes(o.order_status);
           // Gunakan bulan dari parameter (bukan dari timestamp) agar akurat
           const mk = `${y}-${String(m).padStart(2,'0')}`;
           if (!monthlyData[mk]) monthlyData[mk] = {month:mk, omset:0, orders:0, quantity:0, prods:new Set()};
@@ -743,7 +764,7 @@ function renderAll(data) {
   const statusCount = {};
 
   orders.forEach(o => {
-    const isGood = ['COMPLETED','SHIPPED','TO_CONFIRM_RECEIVE'].includes(o.order_status);
+    const isGood = ['COMPLETED','SHIPPED','TO_CONFIRM_RECEIVE','READY_TO_SHIP','PROCESSED','IN_CANCEL'].includes(o.order_status);
     statusCount[o.order_status] = (statusCount[o.order_status]||0)+1;
     if (!isGood) return;
     omset += parseFloat(o.total_amount || 0);
