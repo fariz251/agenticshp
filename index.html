@@ -685,18 +685,20 @@ async function loadData() {
           if (!monthlyData[mk]) monthlyData[mk] = {month:mk, omset:0, orders:0, quantity:0, prods:new Set()};
 
           if (isGood) {
+            // Gunakan total_amount (sudah include ongkir, voucher, dll) untuk omset
             monthlyData[mk].omset  += parseFloat(o.total_amount || 0);
             monthlyData[mk].orders += 1;
           }
 
           for (const it of (o.items || [])) {
-            const qty = it.qty || 1;
+            const qty   = it.qty || 1;
             const price = parseFloat(it.price || 0);
-            const name = it.name || 'Unknown';
+            const name  = it.name || 'Unknown';
             if (isGood) {
               monthlyData[mk].quantity += qty;
               monthlyData[mk].prods.add(name);
             }
+            // Ranking produk tetap pakai qty*price (harga produk saja)
             if (!productMap[name]) productMap[name] = {name, sku:it.sku||'-', qty:0, revenue:0};
             if (isGood) { productMap[name].qty += qty; productMap[name].revenue += qty * price; }
           }
