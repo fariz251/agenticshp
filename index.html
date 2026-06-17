@@ -588,6 +588,7 @@ async function fetchChunk(from, to) {
   let allOrders = [];
   let cursor = '';
   let page = 0;
+  const MAX_PAGES = 50; // safety limit
 
   while (true) {
     page++;
@@ -612,14 +613,19 @@ async function fetchChunk(from, to) {
     const data = await res.json();
     if (!data.success) throw new Error(data.message || 'Error dari Shopee');
 
-    if (data.orders?.length) allOrders.push(...data.orders);
+    const pageOrders = data.orders || [];
+    if (pageOrders.length) allOrders.push(...pageOrders);
 
-    if (data.hasMore && data.nextCursor) {
-      cursor = data.nextCursor;
+    // Cek pagination dari response
+    const more       = data.hasMore || data.more || false;
+    const nextCursor = data.nextCursor || data.next_cursor || '';
+
+    if (more && nextCursor && page < MAX_PAGES) {
+      cursor = nextCursor;
+      toast(`📦 Halaman ${page+1}... (${allOrders.length} order)`, 'inf');
     } else {
       break;
     }
-    if (page >= 20) break; // safety limit
   }
 
   return { success: true, orders: allOrders };
@@ -648,23 +654,26 @@ async function loadData() {
       months = [parseInt(S.month)];
     }
 
+    // Helper: timestamp WIB-safe (Indonesia UTC+7)
+    // Shopee server pakai UTC, jadi kita perlu cover dari jam 17:00 hari sebelumnya
+    // sampai jam 16:59:59 hari berikutnya untuk capture semua order WIB
+    function chunkTs(year, month, startDay, endDay) {
+      const daysInMonth = new Date(year, month, 0).getDate();
+      const ed = Math.min(endDay, daysInMonth);
+      return {
+        // Mulai dari jam 00:00 WIB = jam 17:00 UTC hari sebelumnya
+        from: Math.floor(new Date(year, month-1, startDay, 0, 0, 0).getTime() / 1000),
+        to:   Math.floor(new Date(year, month-1, ed, 23, 59, 59).getTime() / 1000)
+      };
+    }
+
     let totalFetched = 0;
     for (const m of months) {
-      // Split bulan jadi chunk 15 hari
       const daysInMonth = new Date(y, m, 0).getDate();
       const chunks = [];
-      // chunk 1: hari 1-15
-      chunks.push({
-        from: Math.floor(new Date(y, m-1, 1, 0, 0, 0).getTime() / 1000),
-        to:   Math.floor(new Date(y, m-1, Math.min(15, daysInMonth), 23, 59, 59).getTime() / 1000)
-      });
-      // chunk 2: hari 16-akhir (jika > 15 hari)
-      if (daysInMonth > 15) {
-        chunks.push({
-          from: Math.floor(new Date(y, m-1, 16, 0, 0, 0).getTime() / 1000),
-          to:   Math.floor(new Date(y, m-1, daysInMonth, 23, 59, 59).getTime() / 1000)
-        });
-      }
+      // Split per 15 hari (limit Shopee API)
+      chunks.push(chunkTs(y, m, 1, 15));
+      if (daysInMonth > 15) chunks.push(chunkTs(y, m, 16, daysInMonth));
 
       for (const chunk of chunks) {
         const data = await fetchChunk(chunk.from, chunk.to);
