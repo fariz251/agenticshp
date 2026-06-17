@@ -584,51 +584,69 @@ function timeRange() {
 }
 
 // ── Fetch via n8n ─────────────────────────────────────────────────
-async function fetchChunk(from, to) {
-  let allOrders = [];
+// ── Step 1: Kumpulkan semua SNs dengan cursor pagination ──────────
+async function fetchAllSNs(from, to) {
+  const allSNs = [];
   let cursor = '';
   let page = 0;
-  const MAX_PAGES = 50; // safety limit
+  const MAX_PAGES = 100;
 
   while (true) {
     page++;
     const reqBody = {
-      partner_id:       S.cfg.pid,
-      partner_key:      S.cfg.pkey,
-      shop_id:          S.cfg.sid,
-      access_token:     S.cfg.token,
-      time_from:        from,
-      time_to:          to,
+      time_from: from,
+      time_to:   to,
       time_range_field: 'create_time'
     };
     if (cursor) reqBody.cursor = cursor;
 
-    const res = await fetch(`${S.cfg.n8n}/webhook/shopee-orders`, {
+    const res = await fetch(`${S.cfg.n8n}/webhook/shopee-list`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(reqBody)
     });
 
-    if (!res.ok) throw new Error(`HTTP ${res.status} dari n8n`);
+    if (!res.ok) throw new Error(`HTTP ${res.status} dari n8n (list)`);
     const data = await res.json();
-    if (!data.success) throw new Error(data.message || 'Error dari Shopee');
+    if (!data.success) throw new Error(data.message || 'Error list');
 
-    const pageOrders = data.orders || [];
-    if (pageOrders.length) allOrders.push(...pageOrders);
+    if (data.order_sns?.length) allSNs.push(...data.order_sns);
 
-    // Cek pagination dari response
-    const more       = data.hasMore || data.more || false;
-    const nextCursor = data.nextCursor || data.next_cursor || '';
-
-    if (more && nextCursor && page < MAX_PAGES) {
-      cursor = nextCursor;
-      toast(`📦 Halaman ${page+1}... (${allOrders.length} order)`, 'inf');
+    if (data.more && data.next_cursor && page < MAX_PAGES) {
+      cursor = data.next_cursor;
+      toast(`📋 List halaman ${page+1}... (${allSNs.length} SN)`, 'inf');
     } else {
       break;
     }
   }
+  return allSNs;
+}
 
-  return { success: true, orders: allOrders };
+// ── Step 2: Fetch detail per batch 50 SNs ─────────────────────────
+async function fetchDetailBatch(sns) {
+  const allOrders = [];
+  // Fetch per 50 SNs
+  for (let i = 0; i < sns.length; i += 50) {
+    const batch = sns.slice(i, i + 50);
+    const res = await fetch(`${S.cfg.n8n}/webhook/shopee-detail`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ order_sns: batch })
+    });
+    if (!res.ok) throw new Error(`HTTP ${res.status} dari n8n (detail)`);
+    const data = await res.json();
+    if (data.orders?.length) allOrders.push(...data.orders);
+    if (i + 50 < sns.length) toast(`📦 Detail ${Math.min(i+50, sns.length)}/${sns.length}...`, 'inf');
+  }
+  return allOrders;
+}
+
+// ── Main fetch: list all SNs then fetch details ────────────────────
+async function fetchChunk(from, to) {
+  const allSNs = await fetchAllSNs(from, to);
+  if (!allSNs.length) return { success: true, orders: [] };
+  const orders = await fetchDetailBatch(allSNs);
+  return { success: true, orders };
 }
 
 async function loadData() {
@@ -671,9 +689,14 @@ async function loadData() {
     for (const m of months) {
       const daysInMonth = new Date(y, m, 0).getDate();
       const chunks = [];
-      // Split per 15 hari (limit Shopee API)
-      chunks.push(chunkTs(y, m, 1, 15));
-      if (daysInMonth > 15) chunks.push(chunkTs(y, m, 16, daysInMonth));
+      // Split per 7 hari agar tidak melebihi 100 order per chunk
+      // Shopee max 15 hari per request, kita pakai 7 hari untuk handle toko ramai
+      let day = 1;
+      while (day <= daysInMonth) {
+        const endDay = Math.min(day + 6, daysInMonth);
+        chunks.push(chunkTs(y, m, day, endDay));
+        day = endDay + 1;
+      }
 
       for (const chunk of chunks) {
         const data = await fetchChunk(chunk.from, chunk.to);
