@@ -523,9 +523,10 @@ function saveConfig() {
     sid:   document.getElementById('cfg-sid').value.trim(),
     token: document.getElementById('cfg-token').value.trim(),
   };
-  if (!cfg.pid || !cfg.pkey || !cfg.sid || !cfg.token) {
-    toast('Semua field wajib diisi kecuali n8n URL', 'err'); return;
+  if (!cfg.pid || !cfg.pkey || !cfg.sid) {
+    toast('Partner ID, Partner Key, Shop ID wajib diisi', 'err'); return;
   }
+  // Access token opsional - n8n ambil dari Static Data
   localStorage.setItem('shopee_cfg_v2', JSON.stringify(cfg));
   S.cfg = cfg; S.isDemo = false;
   closeSetup();
@@ -559,7 +560,12 @@ function setMonth(m, btn) {
   S.month = m;
   document.querySelectorAll('.mth').forEach(b => b.classList.remove('on'));
   btn.classList.add('on');
-  if (S.raw) renderAll(S.raw);
+  // Render dari data yang sudah ada - tidak perlu fetch ulang
+  if (S.raw) {
+    renderAll(S.raw);
+  } else {
+    loadData();
+  }
 }
 
 function onYearChange() {
@@ -586,7 +592,7 @@ function timeRange() {
 // ── Fetch via n8n ─────────────────────────────────────────────────
 // ── Step 1: Kumpulkan semua SNs dengan cursor pagination ──────────
 async function fetchAllSNs(from, to) {
-  const allSNs = [];
+  const allOrders = [];
   let cursor = '';
   let page = 0;
   const MAX_PAGES = 100;
@@ -594,13 +600,17 @@ async function fetchAllSNs(from, to) {
   while (true) {
     page++;
     const reqBody = {
+      partner_id:   S.cfg.pid   || '2036238',
+      partner_key:  S.cfg.pkey  || '',
+      shop_id:      S.cfg.sid   || '1670690811',
+      access_token: S.cfg.token || '',
       time_from: from,
       time_to:   to,
       time_range_field: 'create_time'
     };
     if (cursor) reqBody.cursor = cursor;
 
-    const res = await fetch(`${S.cfg.n8n}/webhook/shopee-list`, {
+    const res = await fetch(`${S.cfg.n8n}/webhook/shopee-orders`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(reqBody)
@@ -610,42 +620,23 @@ async function fetchAllSNs(from, to) {
     const data = await res.json();
     if (!data.success) throw new Error(data.message || 'Error list');
 
-    if (data.order_sns?.length) allSNs.push(...data.order_sns);
+    // shopee-orders return orders langsung (sudah include detail)
+    const pageOrders = data.orders || [];
+    if (pageOrders.length) allOrders.push(...pageOrders);
 
-    if (data.more && data.next_cursor && page < MAX_PAGES) {
-      cursor = data.next_cursor;
-      toast(`📋 List halaman ${page+1}... (${allSNs.length} SN)`, 'inf');
+    if (data.hasMore && data.nextCursor && page < MAX_PAGES) {
+      cursor = data.nextCursor;
+      toast(`📋 Halaman ${page+1}... (${allOrders.length} order)`, 'inf');
     } else {
       break;
     }
   }
-  return allSNs;
-}
-
-// ── Step 2: Fetch detail per batch 50 SNs ─────────────────────────
-async function fetchDetailBatch(sns) {
-  const allOrders = [];
-  // Fetch per 50 SNs
-  for (let i = 0; i < sns.length; i += 50) {
-    const batch = sns.slice(i, i + 50);
-    const res = await fetch(`${S.cfg.n8n}/webhook/shopee-detail`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ order_sns: batch })
-    });
-    if (!res.ok) throw new Error(`HTTP ${res.status} dari n8n (detail)`);
-    const data = await res.json();
-    if (data.orders?.length) allOrders.push(...data.orders);
-    if (i + 50 < sns.length) toast(`📦 Detail ${Math.min(i+50, sns.length)}/${sns.length}...`, 'inf');
-  }
   return allOrders;
 }
 
-// ── Main fetch: list all SNs then fetch details ────────────────────
+// ── Main fetch: gunakan shopee-orders yang sudah include detail ────
 async function fetchChunk(from, to) {
-  const allSNs = await fetchAllSNs(from, to);
-  if (!allSNs.length) return { success: true, orders: [] };
-  const orders = await fetchDetailBatch(allSNs);
+  const orders = await fetchAllSNs(from, to);
   return { success: true, orders };
 }
 
@@ -664,13 +655,10 @@ async function loadData() {
     const productMap = {};
     const monthlyData = {};
 
-    // Tentukan range bulan yang difetch
-    let months = [];
-    if (S.month === 'all') {
-      for (let m = 1; m <= 12; m++) months.push(m);
-    } else {
-      months = [parseInt(S.month)];
-    }
+    // Selalu fetch SEMUA bulan sekaligus (1-12)
+    // Filter lokal saat user pilih bulan tertentu - tidak perlu fetch ulang
+    const months = [];
+    for (let m = 1; m <= 12; m++) months.push(m);
 
     // Helper: timestamp WIB-safe (Indonesia UTC+7)
     // Shopee server pakai UTC, jadi kita perlu cover dari jam 17:00 hari sebelumnya
