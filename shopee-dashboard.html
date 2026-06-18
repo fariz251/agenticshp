@@ -677,13 +677,10 @@ async function loadData() {
     for (const m of months) {
       const daysInMonth = new Date(y, m, 0).getDate();
       const chunks = [];
-      // Split per 7 hari agar tidak melebihi 100 order per chunk
-      // Shopee max 15 hari per request, kita pakai 7 hari untuk handle toko ramai
-      let day = 1;
-      while (day <= daysInMonth) {
-        const endDay = Math.min(day + 6, daysInMonth);
-        chunks.push(chunkTs(y, m, day, endDay));
-        day = endDay + 1;
+      // Split per 1 hari - toko ini bisa 90+ order/hari di periode ramai
+      // Shopee max 100 order/request, 1 hari = max ~50 order = aman
+      for (let day = 1; day <= daysInMonth; day++) {
+        chunks.push(chunkTs(y, m, day, day));
       }
 
       for (const chunk of chunks) {
