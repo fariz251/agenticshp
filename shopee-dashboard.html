@@ -97,6 +97,7 @@ body {
   padding: 32px;
   width: 90%; max-width: 440px;
   box-shadow: 0 25px 60px rgba(0,0,0,.22);
+  position: relative;
 }
 
 .modal-icon { font-size: 36px; margin-bottom: 14px; }
@@ -322,8 +323,9 @@ tbody tr:hover td { background: #fafafa; }
 <body>
 
 <!-- ─── Modal Setup ─────────────────────────────────── -->
-<div id="modal-bg">
+<div id="modal-bg" onclick="if(event.target===this)closeSetup()">
   <div class="modal">
+    <button onclick="closeSetup()" style="position:absolute;top:16px;right:20px;background:none;border:none;font-size:22px;cursor:pointer;color:#9ca3af;line-height:1;" title="Tutup">✕</button>
     <div class="modal-icon">🛒</div>
     <h2>Setup Shopee Dashboard</h2>
     <p class="modal-sub">Masukkan credentials Shopee Open API. Data disimpan lokal di browser Anda.</p>
