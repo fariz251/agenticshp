@@ -373,7 +373,11 @@ tbody tr:hover td { background: #fafafa; }
   <div class="topbar-right">
     <div class="dot" id="dot"></div>
     <span id="statusLabel">Belum terhubung</span>
+    <span id="lastUpdateLabel" style="font-size:11px;color:var(--sub);display:none;">
+      🕐 Update: <strong id="lastUpdateTime">-</strong>
+    </span>
     <button class="btn btn-primary" id="refreshBtn" onclick="loadData()">🔄 Refresh</button>
+    <button class="btn btn-ghost" style="font-size:12px;padding:7px 10px;" onclick="clearCache()" title="Hapus cache & fetch ulang">🗑️</button>
     <button class="btn btn-ghost" onclick="openSetup()">⚙️</button>
   </div>
 </div>
@@ -490,6 +494,64 @@ const S = {
   isDemo: false,
 };
 
+// ── Cache Keys ────────────────────────────────────────────────────
+function cacheKey() {
+  return `shopee_data_${S.year}`;
+}
+
+function saveCache(data) {
+  try {
+    const cache = {
+      data,
+      savedAt: Date.now(),
+      year: S.year
+    };
+    localStorage.setItem(cacheKey(), JSON.stringify(cache));
+    updateLastUpdateLabel(cache.savedAt);
+    console.log('Cache saved:', new Date().toLocaleString('id-ID'));
+  } catch(e) {
+    console.warn('Cache save failed (storage full?):', e);
+  }
+}
+
+function loadCache() {
+  try {
+    const raw = localStorage.getItem(cacheKey());
+    if (!raw) return null;
+    const cache = JSON.parse(raw);
+    // Cache valid selama 23 jam
+    const age = Date.now() - cache.savedAt;
+    if (age > 23 * 3600 * 1000) {
+      console.log('Cache expired, will fetch fresh data');
+      return null;
+    }
+    return cache;
+  } catch(e) {
+    return null;
+  }
+}
+
+function clearCache() {
+  if (!confirm('Hapus cache dan fetch ulang dari Shopee?')) return;
+  localStorage.removeItem(cacheKey());
+  S.raw = null;
+  document.getElementById('lastUpdateLabel').style.display = 'none';
+  loadData();
+}
+
+function updateLastUpdateLabel(ts) {
+  const lbl = document.getElementById('lastUpdateLabel');
+  const time = document.getElementById('lastUpdateTime');
+  if (!ts) { lbl.style.display = 'none'; return; }
+  const d = new Date(ts);
+  const str = d.toLocaleDateString('id-ID', {day:'2-digit',month:'short',year:'numeric'}) 
+            + ' ' + d.toLocaleTimeString('id-ID', {hour:'2-digit',minute:'2-digit'});
+  time.textContent = str;
+  lbl.style.display = 'inline-flex';
+  lbl.style.alignItems = 'center';
+  lbl.style.gap = '4px';
+}
+
 const MONTHS = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
 
 // ── Boot ──────────────────────────────────────────────────────────
@@ -501,7 +563,20 @@ window.addEventListener('load', () => {
       S.cfg = JSON.parse(saved);
       fillModal();
       closeSetup();
-      loadData();
+
+      // Coba load dari cache dulu
+      const cache = loadCache();
+      if (cache && cache.data) {
+        console.log('Loading from cache...');
+        S.raw = cache.data;
+        updateLastUpdateLabel(cache.savedAt);
+        setStatus('ok');
+        renderAll(S.raw);
+        toast('📦 Data dari cache · ' + new Date(cache.savedAt).toLocaleTimeString('id-ID', {hour:'2-digit',minute:'2-digit'}), 'inf');
+      } else {
+        // Tidak ada cache → fetch dari Shopee
+        loadData();
+      }
     } catch(e) {}
   }
   initCharts();
@@ -751,9 +826,11 @@ async function loadData() {
       orders: allOrders
     };
 
+    // Simpan ke cache
+    saveCache(S.raw);
     renderAll(S.raw);
     setStatus('ok');
-    toast(`✅ ${totalFetched} pesanan dimuat`, 'ok');
+    toast(`✅ ${totalFetched} pesanan dimuat · tersimpan di cache`, 'ok');
 
   } catch(e) {
     setStatus('err');
