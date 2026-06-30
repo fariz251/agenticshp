@@ -6,583 +6,553 @@
 <title>Shopee Sales Dashboard</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
 <style>
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-:root {
-  --shopee:   #ee4d2d;
-  --shopee-2: #ff6b4a;
-  --shopee-bg:#fff5f3;
-  --blue:     #1a73e8;
-  --green:    #1e8a4c;
-  --purple:   #6d28d9;
-  --amber:    #d97706;
-  --text:     #111827;
-  --sub:      #6b7280;
-  --border:   #e5e7eb;
-  --surface:  #ffffff;
-  --bg:       #f9fafb;
-  --shadow-s: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.04);
-  --shadow-m: 0 4px 16px rgba(0,0,0,.08);
-  --radius:   14px;
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --shopee:#ee4d2d;--blue:#1a73e8;--green:#1e8a4c;--purple:#6d28d9;
+  --text:#111827;--sub:#6b7280;--border:#e5e7eb;--surface:#fff;--bg:#f9fafb;
+  --shadow-s:0 1px 3px rgba(0,0,0,.08);--shadow-m:0 4px 16px rgba(0,0,0,.08);--radius:14px;
 }
+body{font-family:'Inter','Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:14px}
 
-body {
-  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
-  background: var(--bg);
-  color: var(--text);
-  min-height: 100vh;
-  font-size: 14px;
-}
+/* Topbar */
+#topbar{position:sticky;top:0;z-index:200;background:var(--surface);border-bottom:1px solid var(--border);height:56px;display:flex;align-items:center;justify-content:space-between;padding:0 24px;box-shadow:var(--shadow-s)}
+.logo{display:flex;align-items:center;gap:10px;font-weight:700;font-size:15px}
+.logo-pill{background:var(--shopee);color:#fff;padding:3px 9px;border-radius:6px;font-size:12px;font-weight:800}
+.topbar-right{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.dot{width:8px;height:8px;border-radius:50%;background:#d1d5db;transition:background .3s;flex-shrink:0}
+.dot.ok{background:#10b981;box-shadow:0 0 0 3px #d1fae5}
+.dot.err{background:var(--shopee)}
+#statusLabel{font-size:12px;color:var(--sub)}
+#lastUpdateBadge{font-size:11px;color:var(--sub);background:#f3f4f6;padding:3px 8px;border-radius:10px;display:none;white-space:nowrap}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border-radius:8px;font-size:13px;font-weight:600;border:none;cursor:pointer;transition:all .15s}
+.btn-primary{background:var(--shopee);color:#fff}
+.btn-primary:hover{background:#d94429}
+.btn-primary:disabled{background:#d1d5db;cursor:not-allowed}
+.btn-ghost{background:transparent;color:var(--sub);border:1.5px solid var(--border)}
+.btn-ghost:hover{background:var(--bg);color:var(--text)}
 
-/* ─ Topbar ─────────────────────────────────────────── */
-#topbar {
-  position: sticky; top: 0; z-index: 200;
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  height: 56px;
-  display: flex; align-items: center; justify-content: space-between;
-  padding: 0 24px;
-  box-shadow: var(--shadow-s);
-}
+/* Progress bar */
+#progressWrap{position:fixed;top:56px;left:0;right:0;z-index:199;display:none}
+#progressBar{height:3px;background:var(--shopee);width:0;transition:width .3s}
+#progressLabel{background:rgba(238,77,45,.9);color:#fff;font-size:11px;font-weight:600;padding:4px 12px;text-align:center}
 
-.logo {
-  display: flex; align-items: center; gap: 10px;
-  font-weight: 700; font-size: 15px;
-}
+/* Modal */
+#modal-bg{position:fixed;inset:0;background:rgba(17,24,39,.55);backdrop-filter:blur(5px);display:flex;align-items:center;justify-content:center;z-index:999}
+#modal-bg.hidden{display:none}
+.modal{background:var(--surface);border-radius:20px;padding:32px;width:90%;max-width:440px;box-shadow:0 25px 60px rgba(0,0,0,.22);position:relative}
+.modal h2{font-size:20px;font-weight:800;margin-bottom:4px}
+.modal-sub{color:var(--sub);font-size:13px;margin-bottom:20px;line-height:1.5}
+.field{margin-bottom:12px}
+.field label{display:block;font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.6px;margin-bottom:4px}
+.field input,.field textarea{width:100%;padding:9px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:13px;font-family:'Courier New',monospace;background:var(--bg);color:var(--text);outline:none;transition:border-color .2s}
+.field input:focus,.field textarea:focus{border-color:var(--shopee);background:#fff}
+.field textarea{resize:vertical;min-height:65px}
+.modal-footer{display:flex;flex-direction:column;gap:8px;margin-top:4px}
+.modal-footer .btn{width:100%;justify-content:center}
+.n8n-hint{background:#eff6ff;border-left:3px solid var(--blue);border-radius:0 8px 8px 0;padding:10px 14px;font-size:12px;color:#1e40af;margin-bottom:16px;line-height:1.5}
 
-.logo-pill {
-  background: var(--shopee); color: #fff;
-  padding: 3px 9px; border-radius: 6px;
-  font-size: 12px; font-weight: 800; letter-spacing: .3px;
-}
+/* Cache status panel */
+#cachePanelBtn{font-size:12px;padding:5px 10px}
+#cachePanel{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;margin:12px 24px 0;display:none;box-shadow:var(--shadow-s)}
+#cachePanel.show{display:block}
+.cache-grid{display:grid;grid-template-columns:repeat(6,1fr);gap:6px;margin-top:10px}
+.cache-month{padding:6px 4px;border-radius:8px;text-align:center;font-size:11px;font-weight:600;cursor:pointer;border:1.5px solid var(--border);transition:all .15s}
+.cache-month.cached{background:#d1fae5;border-color:#10b981;color:#065f46}
+.cache-month.active{background:var(--shopee);border-color:var(--shopee);color:#fff}
+.cache-month.empty{background:var(--bg);color:var(--sub)}
 
-.topbar-right { display: flex; align-items: center; gap: 10px; }
+/* Filter Bar */
+#filter-bar{background:var(--surface);border-bottom:1px solid var(--border);padding:10px 24px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+#filter-bar .label{font-size:12px;font-weight:700;color:var(--sub);white-space:nowrap}
+.year-sel{padding:5px 10px;border-radius:8px;border:1.5px solid var(--border);font-size:13px;background:var(--surface);color:var(--text);outline:none;cursor:pointer}
+.mth{padding:5px 10px;border-radius:20px;border:1.5px solid var(--border);background:var(--surface);color:var(--sub);font-size:12px;font-weight:600;cursor:pointer;transition:all .15s}
+.mth:hover{border-color:var(--shopee);color:var(--shopee)}
+.mth.on{background:var(--shopee);border-color:var(--shopee);color:#fff}
+.mth.has-cache{border-color:#10b981;color:#065f46}
+.mth.has-cache.on{background:var(--shopee);border-color:var(--shopee);color:#fff}
 
-.dot { width: 8px; height: 8px; border-radius: 50%; background: #d1d5db; transition: background .3s; }
-.dot.ok  { background: #10b981; box-shadow: 0 0 0 3px #d1fae5; }
-.dot.err { background: var(--shopee); box-shadow: 0 0 0 3px #fee2e2; }
+/* Main */
+#main{max-width:1340px;margin:0 auto;padding:20px 24px 40px}
 
-#statusLabel { font-size: 12px; color: var(--sub); }
+/* KPI */
+.kpi-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px}
+.kpi{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:20px;box-shadow:var(--shadow-s);position:relative;overflow:hidden;transition:transform .2s}
+.kpi:hover{transform:translateY(-2px);box-shadow:var(--shadow-m)}
+.kpi::after{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:var(--radius) var(--radius) 0 0}
+.kpi.c-shopee::after{background:var(--shopee)}.kpi.c-blue::after{background:var(--blue)}.kpi.c-green::after{background:var(--green)}.kpi.c-purple::after{background:var(--purple)}
+.kpi-emoji{font-size:24px;margin-bottom:10px;display:block}
+.kpi-lbl{font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.6px}
+.kpi-val{font-size:26px;font-weight:800;margin:4px 0 6px;font-variant-numeric:tabular-nums}
+.kpi.c-shopee .kpi-val{color:var(--shopee)}.kpi.c-blue .kpi-val{color:var(--blue)}.kpi.c-green .kpi-val{color:var(--green)}.kpi.c-purple .kpi-val{color:var(--purple)}
+.kpi-note{font-size:11px;color:var(--sub)}
 
-.btn {
-  display: inline-flex; align-items: center; gap: 6px;
-  padding: 7px 15px; border-radius: 8px;
-  font-size: 13px; font-weight: 600;
-  border: none; cursor: pointer; transition: all .15s;
-}
+/* Charts */
+.charts-row{display:grid;grid-template-columns:7fr 3fr;gap:14px;margin-bottom:18px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:22px;box-shadow:var(--shadow-s)}
+.card-title{font-size:13px;font-weight:700;margin-bottom:2px}
+.card-sub{font-size:12px;color:var(--sub);margin-bottom:16px}
+.chart-wrap{position:relative;height:230px}
 
-.btn-primary   { background: var(--shopee); color: #fff; }
-.btn-primary:hover { background: #d94429; }
-.btn-primary:disabled { background: #d1d5db; cursor: not-allowed; }
+/* Top Products */
+.bottom-row{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px}
+.rank-list{list-style:none}
+.rank-row{display:flex;align-items:center;gap:10px;padding:10px 0;border-bottom:1px solid #f3f4f6}
+.rank-row:last-child{border-bottom:none}
+.rn{width:26px;height:26px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex-shrink:0}
+.rn-1{background:#fef3c7;color:#92400e}.rn-2{background:#f3f4f6;color:#374151}.rn-3{background:#fde8d8;color:#9a3412}.rn-x{background:#f9fafb;color:var(--sub)}
+.ri{flex:1;min-width:0}
+.ri-name{font-size:12px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ri-sku{font-size:11px;color:var(--sub);margin-top:1px}
+.rb{width:60px}.rb-track{height:3px;background:#f3f4f6;border-radius:2px}.rb-fill{height:100%;border-radius:2px;background:var(--shopee);transition:width .6s ease}
+.rv{font-size:12px;font-weight:700;white-space:nowrap}
 
-.btn-ghost {
-  background: transparent; color: var(--sub);
-  border: 1.5px solid var(--border);
-}
-.btn-ghost:hover { background: var(--bg); color: var(--text); }
+/* Table */
+.tbl-wrap{overflow-x:auto}
+table{width:100%;border-collapse:collapse}
+thead th{text-align:left;font-size:11px;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.5px;padding:10px 14px;background:var(--bg);border-bottom:1px solid var(--border)}
+thead th:first-child{border-radius:8px 0 0 8px}thead th:last-child{border-radius:0 8px 8px 0}
+tbody td{padding:11px 14px;font-size:13px;border-bottom:1px solid #f3f4f6;vertical-align:middle}
+tbody tr:last-child td{border-bottom:none}
+tbody tr:hover td{background:#fafafa}
+.order-sn{font-family:'Courier New',monospace;font-size:11px;color:var(--sub)}
+.pname{font-weight:600}.psku{font-size:11px;color:var(--sub);margin-top:1px}
+.badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:600}
+.b-done{background:#d1fae5;color:#065f46}.b-ship{background:#dbeafe;color:#1e40af}
+.b-proc{background:#fef3c7;color:#92400e}.b-cancel{background:#fee2e2;color:#991b1b}.b-default{background:#f3f4f6;color:var(--sub)}
+.tbl-header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:16px}
+.empty-msg{text-align:center;padding:48px;color:var(--sub)}
+.eico{font-size:40px;margin-bottom:8px}
 
-/* ─ Setup Modal ──────────────────────────────────────── */
-#modal-bg {
-  position: fixed; inset: 0;
-  background: rgba(17,24,39,.55);
-  backdrop-filter: blur(5px);
-  display: flex; align-items: center; justify-content: center;
-  z-index: 999;
-}
-#modal-bg.hidden { display: none; }
+/* Toast */
+#toast{position:fixed;bottom:22px;right:22px;padding:11px 18px;border-radius:10px;font-size:13px;font-weight:600;color:#fff;opacity:0;transform:translateY(6px);transition:all .25s;pointer-events:none;z-index:9999;max-width:320px}
+#toast.show{opacity:1;transform:none}
+#toast.t-ok{background:#10b981}#toast.t-err{background:#ef4444}#toast.t-inf{background:var(--blue)}
 
-.modal {
-  background: var(--surface);
-  border-radius: 20px;
-  padding: 32px;
-  width: 90%; max-width: 440px;
-  box-shadow: 0 25px 60px rgba(0,0,0,.22);
-  position: relative;
-}
-
-.modal-icon { font-size: 36px; margin-bottom: 14px; }
-.modal h2 { font-size: 20px; font-weight: 800; margin-bottom: 4px; }
-.modal-sub { color: var(--sub); font-size: 13px; margin-bottom: 24px; line-height: 1.5; }
-
-.field { margin-bottom: 14px; }
-.field label { display: block; font-size: 11px; font-weight: 700; color: var(--sub); text-transform: uppercase; letter-spacing: .6px; margin-bottom: 5px; }
-.field input, .field textarea {
-  width: 100%; padding: 9px 12px;
-  border: 1.5px solid var(--border); border-radius: 8px;
-  font-size: 13px; font-family: 'Courier New', monospace;
-  background: var(--bg); color: var(--text);
-  outline: none; transition: border-color .2s;
-}
-.field input:focus, .field textarea:focus { border-color: var(--shopee); background: #fff; }
-.field textarea { resize: vertical; min-height: 68px; }
-
-.modal-footer { display: flex; flex-direction: column; gap: 10px; margin-top: 4px; }
-.modal-footer .btn { width: 100%; justify-content: center; }
-
-.n8n-hint {
-  background: #eff6ff; border-left: 3px solid var(--blue);
-  border-radius: 0 8px 8px 0;
-  padding: 10px 14px; font-size: 12px; color: #1e40af;
-  margin-bottom: 20px; line-height: 1.5;
-}
-.n8n-hint strong { display: block; margin-bottom: 3px; }
-.n8n-hint code { background: #dbeafe; padding: 1px 5px; border-radius: 4px; font-family: 'Courier New', monospace; }
-
-/* ─ Filter Bar ───────────────────────────────────────── */
-#filter-bar {
-  background: var(--surface);
-  border-bottom: 1px solid var(--border);
-  padding: 12px 24px;
-  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-}
-
-#filter-bar .label { font-size: 12px; font-weight: 700; color: var(--sub); white-space: nowrap; }
-
-.year-sel {
-  padding: 5px 10px; border-radius: 8px;
-  border: 1.5px solid var(--border);
-  font-size: 13px; background: var(--surface); color: var(--text);
-  outline: none; cursor: pointer;
-}
-
-.mth {
-  padding: 5px 12px; border-radius: 20px;
-  border: 1.5px solid var(--border);
-  background: var(--surface); color: var(--sub);
-  font-size: 12px; font-weight: 600; cursor: pointer;
-  transition: all .15s;
-}
-.mth:hover { border-color: var(--shopee); color: var(--shopee); }
-.mth.on { background: var(--shopee); border-color: var(--shopee); color: #fff; }
-
-/* ─ Main Content ─────────────────────────────────────── */
-#main { max-width: 1340px; margin: 0 auto; padding: 22px 24px 40px; }
-
-/* ─ KPI Grid ─────────────────────────────────────────── */
-.kpi-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 14px;
-  margin-bottom: 18px;
-}
-
-.kpi {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 20px;
-  box-shadow: var(--shadow-s);
-  position: relative; overflow: hidden;
-  transition: transform .2s, box-shadow .2s;
-}
-.kpi:hover { transform: translateY(-2px); box-shadow: var(--shadow-m); }
-
-.kpi::after {
-  content: '';
-  position: absolute; top: 0; left: 0; right: 0;
-  height: 3px; border-radius: var(--radius) var(--radius) 0 0;
-}
-.kpi.c-shopee::after  { background: var(--shopee); }
-.kpi.c-blue::after    { background: var(--blue); }
-.kpi.c-green::after   { background: var(--green); }
-.kpi.c-purple::after  { background: var(--purple); }
-
-.kpi-emoji { font-size: 24px; margin-bottom: 10px; }
-.kpi-lbl { font-size: 11px; font-weight: 700; color: var(--sub); text-transform: uppercase; letter-spacing: .6px; }
-.kpi-val {
-  font-size: 26px; font-weight: 800; margin: 4px 0 6px;
-  font-variant-numeric: tabular-nums;
-}
-.kpi.c-shopee .kpi-val  { color: var(--shopee); }
-.kpi.c-blue .kpi-val    { color: var(--blue); }
-.kpi.c-green .kpi-val   { color: var(--green); }
-.kpi.c-purple .kpi-val  { color: var(--purple); }
-.kpi-note { font-size: 11px; color: var(--sub); }
-
-/* ─ Charts ───────────────────────────────────────────── */
-.charts-row {
-  display: grid; grid-template-columns: 7fr 3fr;
-  gap: 14px; margin-bottom: 18px;
-}
-
-.card {
-  background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  padding: 22px;
-  box-shadow: var(--shadow-s);
-}
-
-.card-title { font-size: 13px; font-weight: 700; margin-bottom: 2px; }
-.card-sub   { font-size: 12px; color: var(--sub); margin-bottom: 16px; }
-
-.chart-wrap { position: relative; height: 230px; }
-
-/* ─ Bottom Grid ──────────────────────────────────────── */
-.bottom-row {
-  display: grid; grid-template-columns: 1fr 1fr;
-  gap: 14px; margin-bottom: 18px;
-}
-
-.rank-list { list-style: none; }
-.rank-row {
-  display: flex; align-items: center; gap: 10px;
-  padding: 10px 0; border-bottom: 1px solid #f3f4f6;
-}
-.rank-row:last-child { border-bottom: none; }
-
-.rn {
-  width: 26px; height: 26px; border-radius: 7px;
-  display: flex; align-items: center; justify-content: center;
-  font-size: 11px; font-weight: 800; flex-shrink: 0;
-}
-.rn-1 { background: #fef3c7; color: #92400e; }
-.rn-2 { background: #f3f4f6; color: #374151; }
-.rn-3 { background: #fde8d8; color: #9a3412; }
-.rn-x { background: #f9fafb; color: var(--sub); }
-
-.ri { flex: 1; min-width: 0; }
-.ri-name { font-size: 12px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.ri-sku  { font-size: 11px; color: var(--sub); margin-top: 1px; }
-
-.rb { width: 60px; }
-.rb-track { height: 3px; background: #f3f4f6; border-radius: 2px; }
-.rb-fill  { height: 100%; border-radius: 2px; background: var(--shopee); transition: width .6s ease; }
-
-.rv { font-size: 12px; font-weight: 700; white-space: nowrap; }
-
-/* ─ Orders Table ─────────────────────────────────────── */
-.tbl-wrap { overflow-x: auto; }
-table { width: 100%; border-collapse: collapse; }
-thead th {
-  text-align: left; font-size: 11px; font-weight: 700;
-  color: var(--sub); text-transform: uppercase; letter-spacing: .5px;
-  padding: 10px 14px; background: var(--bg);
-  border-bottom: 1px solid var(--border);
-}
-thead th:first-child { border-radius: 8px 0 0 8px; }
-thead th:last-child  { border-radius: 0 8px 8px 0; }
-tbody td { padding: 11px 14px; font-size: 13px; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
-tbody tr:last-child td { border-bottom: none; }
-tbody tr:hover td { background: #fafafa; }
-
-.order-sn { font-family: 'Courier New', monospace; font-size: 11px; color: var(--sub); }
-.pname { font-weight: 600; }
-.psku  { font-size: 11px; color: var(--sub); margin-top: 1px; }
-
-.badge {
-  display: inline-block; padding: 2px 8px;
-  border-radius: 10px; font-size: 11px; font-weight: 600;
-}
-.b-done    { background: #d1fae5; color: #065f46; }
-.b-ship    { background: #dbeafe; color: #1e40af; }
-.b-proc    { background: #fef3c7; color: #92400e; }
-.b-cancel  { background: #fee2e2; color: #991b1b; }
-.b-default { background: #f3f4f6; color: var(--sub); }
-
-.tbl-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 16px; }
-.empty-msg { text-align: center; padding: 48px; color: var(--sub); }
-.empty-msg .eico { font-size: 40px; margin-bottom: 8px; }
-
-/* ─ Loading ──────────────────────────────────────────── */
-.spinner {
-  width: 32px; height: 32px;
-  border: 3px solid #f3f4f6;
-  border-top-color: var(--shopee);
-  border-radius: 50%;
-  animation: spin .7s linear infinite;
-  margin: 0 auto 12px;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
-
-.loading-box { text-align: center; padding: 48px; color: var(--sub); font-size: 13px; }
-.loading-icon { animation: spin .7s linear infinite; display: inline-block; font-size: 22px; }
-
-/* ─ Toast ────────────────────────────────────────────── */
-#toast {
-  position: fixed; bottom: 22px; right: 22px;
-  padding: 11px 18px; border-radius: 10px;
-  font-size: 13px; font-weight: 600; color: #fff;
-  opacity: 0; transform: translateY(6px);
-  transition: all .25s; pointer-events: none; z-index: 9999;
-}
-#toast.show { opacity: 1; transform: none; }
-#toast.t-ok  { background: #10b981; }
-#toast.t-err { background: #ef4444; }
-#toast.t-inf { background: var(--blue); }
-
-/* ─ Responsive ───────────────────────────────────────── */
-@media (max-width: 900px) {
-  .kpi-grid    { grid-template-columns: repeat(2,1fr); }
-  .charts-row  { grid-template-columns: 1fr; }
-  .bottom-row  { grid-template-columns: 1fr; }
-  #main        { padding: 16px; }
+@media(max-width:900px){
+  .kpi-grid{grid-template-columns:repeat(2,1fr)}
+  .charts-row,.bottom-row{grid-template-columns:1fr}
+  #main{padding:16px}
+  .cache-grid{grid-template-columns:repeat(4,1fr)}
 }
 </style>
 </head>
 <body>
 
-<!-- ─── Modal Setup ─────────────────────────────────── -->
+<!-- Modal Setup -->
 <div id="modal-bg" onclick="if(event.target===this)closeSetup()">
   <div class="modal">
-    <button onclick="closeSetup()" style="position:absolute;top:16px;right:20px;background:none;border:none;font-size:22px;cursor:pointer;color:#9ca3af;line-height:1;" title="Tutup">✕</button>
-    <div class="modal-icon">🛒</div>
+    <button onclick="closeSetup()" style="position:absolute;top:16px;right:20px;background:none;border:none;font-size:22px;cursor:pointer;color:#9ca3af">✕</button>
+    <div style="font-size:36px;margin-bottom:12px">🛒</div>
     <h2>Setup Shopee Dashboard</h2>
-    <p class="modal-sub">Masukkan credentials Shopee Open API. Data disimpan lokal di browser Anda.</p>
-
-    <div class="n8n-hint">
-      <strong>🔌 Menggunakan n8n sebagai backend</strong>
-      Pastikan n8n sudah berjalan di <code>localhost:5678</code> dan workflow sudah di-import & aktif.
-    </div>
-
-    <div class="field">
-      <label>n8n Base URL</label>
-      <input id="cfg-n8n" value="http://localhost:5678" placeholder="http://localhost:5678">
-    </div>
-    <div class="field">
-      <label>Partner ID</label>
-      <input id="cfg-pid" value="2036238">
-    </div>
-    <div class="field">
-      <label>Partner Key</label>
-      <input id="cfg-pkey" value="shpk6d6b564c4a50466d57574349504647474a43576a48567556555465755a4b">
-    </div>
-    <div class="field">
-      <label>Shop ID</label>
-      <input id="cfg-sid" value="1670690811">
-    </div>
-    <div class="field">
-      <label>Access Token</label>
-      <textarea id="cfg-token" placeholder="Dapatkan token via tab Auth di bawah, atau paste di sini"></textarea>
-    </div>
-
+    <p class="modal-sub">Credentials tersimpan lokal di browser Anda.</p>
+    <div class="n8n-hint">🔌 Pastikan n8n berjalan di <strong>localhost:5678</strong> dan workflow aktif.</div>
+    <div class="field"><label>n8n Base URL</label><input id="cfg-n8n" value="http://localhost:5678"></div>
+    <div class="field"><label>Partner ID</label><input id="cfg-pid" value="2036238"></div>
+    <div class="field"><label>Partner Key</label><input id="cfg-pkey" value="shpk6d6b564c4a50466d57574349504647474a43576a48567556555465755a4b"></div>
+    <div class="field"><label>Shop ID</label><input id="cfg-sid" value="1670690811"></div>
+    <div class="field"><label>Access Token</label><textarea id="cfg-token" placeholder="Paste access token dari n8n..."></textarea></div>
     <div class="modal-footer">
       <button class="btn btn-primary" onclick="saveConfig()">✅ Simpan & Muat Data</button>
-      <button class="btn btn-ghost" onclick="openAuthTab()">🔑 Belum punya token? Generate dulu</button>
-      <button class="btn btn-ghost" onclick="loadDemo()">📊 Coba dengan Data Demo</button>
+      <button class="btn btn-ghost" onclick="openAuthTab()">🔑 Generate Token</button>
+      <button class="btn btn-ghost" onclick="loadDemo()">📊 Data Demo</button>
     </div>
   </div>
 </div>
 
-<!-- ─── Topbar ──────────────────────────────────────── -->
+<!-- Topbar -->
 <div id="topbar">
-  <div class="logo">
-    <span class="logo-pill">SHOPEE</span>
-    Sales Dashboard
-  </div>
+  <div class="logo"><span class="logo-pill">SHOPEE</span> Sales Dashboard</div>
   <div class="topbar-right">
     <div class="dot" id="dot"></div>
     <span id="statusLabel">Belum terhubung</span>
-    <span id="lastUpdateLabel" style="font-size:11px;color:var(--sub);display:none;">
-      🕐 Update: <strong id="lastUpdateTime">-</strong>
-    </span>
-    <button class="btn btn-primary" id="refreshBtn" onclick="loadData()">🔄 Refresh</button>
-    <button class="btn btn-ghost" style="font-size:12px;padding:7px 10px;" onclick="clearCache()" title="Hapus cache & fetch ulang">🗑️</button>
-    <button class="btn btn-ghost" onclick="openSetup()">⚙️</button>
+    <span id="lastUpdateBadge">🕐 <span id="lastUpdateTime">-</span></span>
+    <button class="btn btn-primary btn-sm" id="refreshBtn" onclick="refreshData()" style="font-size:12px;padding:6px 12px">🔄 Refresh</button>
+    <button class="btn btn-ghost" id="cachePanelBtn" onclick="toggleCachePanel()" style="font-size:12px;padding:6px 10px" title="Status Cache per Bulan">📦 Cache</button>
+    <button class="btn btn-ghost" onclick="clearAllCache()" style="font-size:12px;padding:6px 10px" title="Hapus semua cache">🗑️</button>
+    <button class="btn btn-ghost" onclick="openSetup()" style="padding:6px 10px">⚙️</button>
   </div>
 </div>
 
-<!-- ─── Filter Bar ──────────────────────────────────── -->
+<!-- Progress Bar -->
+<div id="progressWrap">
+  <div id="progressBar"></div>
+  <div id="progressLabel">Memuat data...</div>
+</div>
+
+<!-- Cache Panel -->
+<div id="cachePanel">
+  <div style="display:flex;justify-content:space-between;align-items:center">
+    <div style="font-size:13px;font-weight:700">📦 Status Cache per Bulan</div>
+    <button class="btn btn-ghost" onclick="fetchAllMonths()" style="font-size:12px;padding:5px 12px">⬇️ Fetch Semua Bulan</button>
+  </div>
+  <div class="cache-grid" id="cacheGrid"></div>
+  <div style="font-size:11px;color:var(--sub);margin-top:8px">🟢 = tersimpan di cache · klik bulan untuk load/fetch</div>
+</div>
+
+<!-- Filter Bar -->
 <div id="filter-bar">
   <span class="label">Periode:</span>
   <select class="year-sel" id="yearSel" onchange="onYearChange()">
-    <option value="2026">2026</option><option value="2025">2025</option><option value="2024">2024</option><option value="2023">2023</option>
+    <option value="2026">2026</option><option value="2025">2025</option><option value="2024">2024</option>
   </select>
-  <button class="mth on" data-m="all"  onclick="setMonth('all',this)">Semua</button>
-  <button class="mth"    data-m="1"    onclick="setMonth(1,this)">Jan</button>
-  <button class="mth"    data-m="2"    onclick="setMonth(2,this)">Feb</button>
-  <button class="mth"    data-m="3"    onclick="setMonth(3,this)">Mar</button>
-  <button class="mth"    data-m="4"    onclick="setMonth(4,this)">Apr</button>
-  <button class="mth"    data-m="5"    onclick="setMonth(5,this)">Mei</button>
-  <button class="mth"    data-m="6"    onclick="setMonth(6,this)">Jun</button>
-  <button class="mth"    data-m="7"    onclick="setMonth(7,this)">Jul</button>
-  <button class="mth"    data-m="8"    onclick="setMonth(8,this)">Agu</button>
-  <button class="mth"    data-m="9"    onclick="setMonth(9,this)">Sep</button>
-  <button class="mth"    data-m="10"   onclick="setMonth(10,this)">Okt</button>
-  <button class="mth"    data-m="11"   onclick="setMonth(11,this)">Nov</button>
-  <button class="mth"    data-m="12"   onclick="setMonth(12,this)">Des</button>
+  <button class="mth on"  data-m="all" onclick="setMonth('all',this)">Semua</button>
+  <button class="mth" data-m="1"  onclick="setMonth(1,this)">Jan</button>
+  <button class="mth" data-m="2"  onclick="setMonth(2,this)">Feb</button>
+  <button class="mth" data-m="3"  onclick="setMonth(3,this)">Mar</button>
+  <button class="mth" data-m="4"  onclick="setMonth(4,this)">Apr</button>
+  <button class="mth" data-m="5"  onclick="setMonth(5,this)">Mei</button>
+  <button class="mth" data-m="6"  onclick="setMonth(6,this)">Jun</button>
+  <button class="mth" data-m="7"  onclick="setMonth(7,this)">Jul</button>
+  <button class="mth" data-m="8"  onclick="setMonth(8,this)">Agu</button>
+  <button class="mth" data-m="9"  onclick="setMonth(9,this)">Sep</button>
+  <button class="mth" data-m="10" onclick="setMonth(10,this)">Okt</button>
+  <button class="mth" data-m="11" onclick="setMonth(11,this)">Nov</button>
+  <button class="mth" data-m="12" onclick="setMonth(12,this)">Des</button>
 </div>
 
-<!-- ─── Main ────────────────────────────────────────── -->
+<!-- Main -->
 <div id="main">
-
   <!-- KPI -->
-  <div class="kpi-grid">
-    <div class="kpi c-shopee">
-      <div class="kpi-emoji">💰</div>
-      <div class="kpi-lbl">Total Omset</div>
-      <div class="kpi-val" id="kOmset">—</div>
-      <div class="kpi-note" id="kOmsetNote">—</div>
-    </div>
-    <div class="kpi c-blue">
-      <div class="kpi-emoji">🧾</div>
-      <div class="kpi-lbl">Total Pesanan</div>
-      <div class="kpi-val" id="kOrders">—</div>
-      <div class="kpi-note" id="kOrdersNote">Completed / Shipped</div>
-    </div>
-    <div class="kpi c-green">
-      <div class="kpi-emoji">📦</div>
-      <div class="kpi-lbl">Produk Unik</div>
-      <div class="kpi-val" id="kProducts">—</div>
-      <div class="kpi-note" id="kProductsNote">Jenis produk terjual</div>
-    </div>
-    <div class="kpi c-purple">
-      <div class="kpi-emoji">🔢</div>
-      <div class="kpi-lbl">Total Quantity</div>
-      <div class="kpi-val" id="kQty">—</div>
-      <div class="kpi-note" id="kQtyNote">Total item terjual</div>
-    </div>
+  <div class="kpi-grid" style="grid-template-columns:repeat(5,1fr)">
+    <div class="kpi c-shopee"><span class="kpi-emoji">💰</span><div class="kpi-lbl">Total Omset</div><div class="kpi-val" id="kOmset">—</div><div class="kpi-note" id="kOmsetNote">—</div></div>
+    <div class="kpi" style="--accent:#059669"><span class="kpi-emoji">💵</span><div class="kpi-lbl">Net Income</div><div class="kpi-val" id="kNet" style="color:#059669">—</div><div class="kpi-note" id="kNetNote"><button onclick="loadEscrowData()" id="btnEscrow" class="btn btn-ghost" style="font-size:11px;padding:3px 8px;margin-top:2px">Hitung ▶</button></div></div>
+    <div class="kpi c-blue"><span class="kpi-emoji">🧾</span><div class="kpi-lbl">Total Pesanan</div><div class="kpi-val" id="kOrders">—</div><div class="kpi-note" id="kOrdersNote">—</div></div>
+    <div class="kpi c-green"><span class="kpi-emoji">📦</span><div class="kpi-lbl">Produk Unik</div><div class="kpi-val" id="kProducts">—</div><div class="kpi-note" id="kProductsNote">Jenis produk terjual</div></div>
+    <div class="kpi c-purple"><span class="kpi-emoji">🔢</span><div class="kpi-lbl">Total Quantity</div><div class="kpi-val" id="kQty">—</div><div class="kpi-note" id="kQtyNote">Total item</div></div>
   </div>
 
   <!-- Charts -->
   <div class="charts-row">
-    <div class="card">
-      <div class="card-title">📈 Tren Omset</div>
-      <div class="card-sub" id="chartSubOmset">Revenue per bulan</div>
-      <div class="chart-wrap"><canvas id="chartOmset"></canvas></div>
+    <div class="card"><div class="card-title">📈 Tren Omset</div><div class="card-sub" id="chartSubOmset">Revenue per bulan</div><div class="chart-wrap"><canvas id="chartOmset"></canvas></div></div>
+    <div class="card"><div class="card-title">🥧 Status Pesanan</div><div class="card-sub">Distribusi semua order</div><div class="chart-wrap"><canvas id="chartStatus"></canvas></div></div>
+  </div>
+
+  <!-- Keuangan -->
+  <div class="card" id="financeCard" style="margin-bottom:18px;display:none">
+    <div class="tbl-header">
+      <div>
+        <div class="card-title">💵 Breakdown Keuangan</div>
+        <div class="card-sub" id="financeSub">Detail pendapatan bersih dari Shopee</div>
+      </div>
+      <button class="btn btn-ghost" style="font-size:12px" onclick="loadEscrowData()">🔄 Refresh</button>
     </div>
-    <div class="card">
-      <div class="card-title">🥧 Status Pesanan</div>
-      <div class="card-sub">Distribusi semua order</div>
-      <div class="chart-wrap"><canvas id="chartStatus"></canvas></div>
+    <!-- Summary Cards -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:18px" id="financeSummary">
+      <div style="background:#f0fdf4;border-radius:10px;padding:14px;text-align:center">
+        <div style="font-size:11px;color:#16a34a;font-weight:700;text-transform:uppercase">Net Income</div>
+        <div style="font-size:20px;font-weight:800;color:#16a34a;margin:4px 0" id="fNet">—</div>
+        <div style="font-size:11px;color:#6b7280">Setelah semua potongan</div>
+      </div>
+      <div style="background:#fef3c7;border-radius:10px;padding:14px;text-align:center">
+        <div style="font-size:11px;color:#d97706;font-weight:700;text-transform:uppercase">Komisi Shopee</div>
+        <div style="font-size:20px;font-weight:800;color:#d97706;margin:4px 0" id="fCommission">—</div>
+        <div style="font-size:11px;color:#6b7280" id="fCommissionPct">—% dari omset</div>
+      </div>
+      <div style="background:#eff6ff;border-radius:10px;padding:14px;text-align:center">
+        <div style="font-size:11px;color:#1d4ed8;font-weight:700;text-transform:uppercase">Biaya Layanan</div>
+        <div style="font-size:20px;font-weight:800;color:#1d4ed8;margin:4px 0" id="fService">—</div>
+        <div style="font-size:11px;color:#6b7280">Service fee</div>
+      </div>
+      <div style="background:#fdf2f8;border-radius:10px;padding:14px;text-align:center">
+        <div style="font-size:11px;color:#9333ea;font-weight:700;text-transform:uppercase">Voucher Seller</div>
+        <div style="font-size:20px;font-weight:800;color:#9333ea;margin:4px 0" id="fVoucher">—</div>
+        <div style="font-size:11px;color:#6b7280">Ditanggung seller</div>
+      </div>
+    </div>
+    <!-- Net Income Chart -->
+    <div style="display:grid;grid-template-columns:2fr 1fr;gap:14px">
+      <div>
+        <div style="font-size:13px;font-weight:700;margin-bottom:4px">📊 Omset vs Net Income</div>
+        <div style="font-size:12px;color:#6b7280;margin-bottom:12px">Perbandingan gross vs bersih</div>
+        <div style="position:relative;height:200px"><canvas id="chartFinance"></canvas></div>
+      </div>
+      <div>
+        <div style="font-size:13px;font-weight:700;margin-bottom:4px">🥧 Distribusi Potongan</div>
+        <div style="font-size:12px;color:#6b7280;margin-bottom:12px">Komposisi pengurangan</div>
+        <div style="position:relative;height:200px"><canvas id="chartDeductions"></canvas></div>
+      </div>
+    </div>
+    <!-- Loading indicator -->
+    <div id="escrowLoading" style="display:none;text-align:center;padding:24px;color:#6b7280">
+      <div style="font-size:24px;animation:spin .7s linear infinite;display:inline-block">⏳</div>
+      <div style="margin-top:8px" id="escrowLoadingText">Mengambil data keuangan...</div>
     </div>
   </div>
 
   <!-- Top Products -->
   <div class="bottom-row">
-    <div class="card">
-      <div class="card-title">🏆 Top 8 — Omset</div>
-      <div class="card-sub">Produk dengan revenue tertinggi</div>
-      <ul class="rank-list" id="topRevList"><li class="empty-msg"><div class="eico">📭</div>Belum ada data</li></ul>
-    </div>
-    <div class="card">
-      <div class="card-title">📦 Top 8 — Quantity</div>
-      <div class="card-sub">Produk paling banyak terjual</div>
-      <ul class="rank-list" id="topQtyList"><li class="empty-msg"><div class="eico">📭</div>Belum ada data</li></ul>
-    </div>
+    <div class="card"><div class="card-title">🏆 Top 10 — Omset</div><div class="card-sub">Revenue tertinggi per produk</div><ul class="rank-list" id="topRevList"><li class="empty-msg"><div class="eico">📭</div>Belum ada data</li></ul></div>
+    <div class="card"><div class="card-title">📦 Top 10 — Quantity</div><div class="card-sub">Paling banyak terjual</div><ul class="rank-list" id="topQtyList"><li class="empty-msg"><div class="eico">📭</div>Belum ada data</li></ul></div>
   </div>
 
   <!-- Orders Table -->
   <div class="card">
     <div class="tbl-header">
-      <div>
-        <div class="card-title">📋 Daftar Pesanan</div>
-        <div class="card-sub" id="tblSub">—</div>
-      </div>
-      <div style="display:flex;gap:8px;">
-        <button class="btn btn-ghost" style="font-size:12px;" onclick="exportCSV()">📥 Export CSV</button>
-      </div>
+      <div><div class="card-title">📋 Daftar Pesanan</div><div class="card-sub" id="tblSub">—</div></div>
+      <button class="btn btn-ghost" style="font-size:12px" onclick="exportCSV()">📥 Export CSV</button>
     </div>
-    <div id="tblWrap" class="tbl-wrap">
-      <div class="empty-msg"><div class="eico">📭</div>Klik Refresh untuk muat data</div>
-    </div>
+    <div id="tblWrap" class="tbl-wrap"><div class="empty-msg"><div class="eico">📭</div>Pilih bulan untuk muat data</div></div>
   </div>
-
 </div>
 
-<!-- Toast -->
 <div id="toast"></div>
 
 <script>
-// ── State ─────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════
+// STATE
+// ═══════════════════════════════════════════════════════════════════
 const S = {
   cfg: null,
-  raw: null,          // raw response from n8n
   month: 'all',
   year: new Date().getFullYear(),
   charts: {},
   isDemo: false,
+  // Cache per bulan: { '2026-01': { orders:[], savedAt:ts }, ... }
+  monthCache: {},
 };
 
-// ── Cache Keys ────────────────────────────────────────────────────
-function cacheKey() {
-  return `shopee_data_${S.year}`;
-}
-
-function saveCache(data) {
-  try {
-    const cache = {
-      data,
-      savedAt: Date.now(),
-      year: S.year
-    };
-    localStorage.setItem(cacheKey(), JSON.stringify(cache));
-    updateLastUpdateLabel(cache.savedAt);
-    console.log('Cache saved:', new Date().toLocaleString('id-ID'));
-  } catch(e) {
-    console.warn('Cache save failed (storage full?):', e);
-  }
-}
-
-function loadCache() {
-  try {
-    const raw = localStorage.getItem(cacheKey());
-    if (!raw) return null;
-    const cache = JSON.parse(raw);
-    // Cache valid selama 23 jam
-    const age = Date.now() - cache.savedAt;
-    if (age > 23 * 3600 * 1000) {
-      console.log('Cache expired, will fetch fresh data');
-      return null;
-    }
-    return cache;
-  } catch(e) {
-    return null;
-  }
-}
-
-function clearCache() {
-  if (!confirm('Hapus cache dan fetch ulang dari Shopee?')) return;
-  localStorage.removeItem(cacheKey());
-  S.raw = null;
-  document.getElementById('lastUpdateLabel').style.display = 'none';
-  loadData();
-}
-
-function updateLastUpdateLabel(ts) {
-  const lbl = document.getElementById('lastUpdateLabel');
-  const time = document.getElementById('lastUpdateTime');
-  if (!ts) { lbl.style.display = 'none'; return; }
-  const d = new Date(ts);
-  const str = d.toLocaleDateString('id-ID', {day:'2-digit',month:'short',year:'numeric'}) 
-            + ' ' + d.toLocaleTimeString('id-ID', {hour:'2-digit',minute:'2-digit'});
-  time.textContent = str;
-  lbl.style.display = 'inline-flex';
-  lbl.style.alignItems = 'center';
-  lbl.style.gap = '4px';
-}
-
 const MONTHS = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
+const VALID_STATUS = new Set(['COMPLETED','SHIPPED','TO_CONFIRM_RECEIVE','READY_TO_SHIP','PROCESSED','IN_CANCEL']);
 
-// ── Boot ──────────────────────────────────────────────────────────
-window.addEventListener('load', () => {
+// ═══════════════════════════════════════════════════════════════════
+// CACHE - per bulan di n8n Static Data (persistent, tidak hilang)
+// ═══════════════════════════════════════════════════════════════════
+
+// Simpan orders 1 bulan ke n8n Static Data
+async function saveMonthCache(year, month, orders) {
+  const mk = `${year}-${String(month).padStart(2,'0')}`;
+  // Simpan ke memory dulu (instan)
+  S.monthCache[mk] = { orders, savedAt: Date.now(), year, month };
+  updateCacheGrid();
+  updateMonthBtnCache();
+  updateLastUpdate();
+
+  // Simpan ke n8n Static Data (persistent)
+  try {
+    if (!S.cfg?.n8n) return;
+    await fetch(`${S.cfg.n8n}/webhook/shopee-save-cache`, {
+      method: 'POST', mode: 'cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ year, month, orders })
+    });
+    console.log(`n8n cache saved: ${mk}`);
+  } catch(e) {
+    console.warn('n8n cache save failed:', e.message);
+    // Fallback ke localStorage
+    try {
+      localStorage.setItem(`shopee_m_${mk}`, JSON.stringify({ orders, savedAt: Date.now() }));
+    } catch(e2) {}
+  }
+}
+
+// Load orders 1 bulan dari n8n Static Data
+async function loadMonthFromN8n(year, month) {
+  if (!S.cfg?.n8n) return null;
+  try {
+    const res = await fetch(`${S.cfg.n8n}/webhook/shopee-load-month`, {
+      method: 'POST', mode: 'cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ year, month })
+    });
+    const data = await res.json();
+    if (data.found && data.orders?.length > 0) {
+      const mk = `${year}-${String(month).padStart(2,'0')}`;
+      S.monthCache[mk] = { orders: data.orders, savedAt: data.savedAt, year, month };
+      return S.monthCache[mk];
+    }
+  } catch(e) {
+    console.warn('n8n load failed:', e.message);
+  }
+  return null;
+}
+
+// Load metadata cache semua bulan dari n8n
+async function loadCacheMetaFromN8n(year) {
+  if (!S.cfg?.n8n) return {};
+  try {
+    const res = await fetch(`${S.cfg.n8n}/webhook/shopee-cache-meta`, {
+      method: 'POST', mode: 'cors',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ year })
+    });
+    const data = await res.json();
+    return data.meta || {};
+  } catch(e) { return {}; }
+}
+
+function loadMonthCache(year, month) {
+  const mk = `${year}-${String(month).padStart(2,'0')}`;
+  return S.monthCache[mk] || null;
+}
+
+function isCacheValid(year, month) {
+  const data = loadMonthCache(year, month);
+  if (!data) return false;
+  const now = new Date();
+  const isCurrentMonth = (year === now.getFullYear() && month === now.getMonth()+1);
+  const maxAge = isCurrentMonth ? 6*3600*1000 : 48*3600*1000;
+  return (Date.now() - data.savedAt) < maxAge;
+}
+
+function clearAllCache() {
+  if (!confirm('Hapus semua cache?')) return;
+  S.monthCache = {};
+  // Hapus localStorage fallback
+  Object.keys(localStorage).filter(k=>k.startsWith('shopee_m_')).forEach(k=>localStorage.removeItem(k));
+  updateCacheGrid();
+  toast('Cache dihapus', 'inf');
+}
+
+function clearMonthCache(year, month) {
+  const mk = `${year}-${String(month).padStart(2,'0')}`;
+  delete S.monthCache[mk];
+  localStorage.removeItem(`shopee_m_${mk}`);
+  updateCacheGrid();
+}
+
+async function loadAllCacheFromStorage() {
+  // 1. Load dari localStorage fallback dulu (instan)
+  Object.keys(localStorage).filter(k=>k.startsWith('shopee_m_')).forEach(key => {
+    try {
+      const mk = key.replace('shopee_m_','');
+      const data = JSON.parse(localStorage.getItem(key));
+      const [y,m] = mk.split('-').map(Number);
+      if (!S.monthCache[mk]) S.monthCache[mk] = { ...data, year:y, month:m };
+    } catch(e) {}
+  });
+
+  // 2. Load metadata dari n8n (untuk tahu bulan mana yang tersimpan)
+  if (S.cfg?.n8n) {
+    const meta = await loadCacheMetaFromN8n(S.year);
+    Object.entries(meta).forEach(([key, info]) => {
+      const mk = `${S.year}-${String(info.month).padStart(2,'0')}`;
+      if (!S.monthCache[mk]) {
+        // Ada di n8n tapi belum di memory - tandai sebagai tersimpan
+        S.monthCache[mk] = { orders: null, savedAt: info.savedAt, year: S.year, month: info.month, count: info.count, needLoad: true };
+      }
+    });
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// BOOT
+// ═══════════════════════════════════════════════════════════════════
+window.addEventListener('load', async () => {
   document.getElementById('yearSel').value = S.year;
+
   const saved = localStorage.getItem('shopee_cfg_v2');
   if (saved) {
     try {
       S.cfg = JSON.parse(saved);
       fillModal();
       closeSetup();
+      setStatus('ok');
+      initCharts();
 
-      // Coba load dari cache dulu
-      const cache = loadCache();
-      if (cache && cache.data) {
-        console.log('Loading from cache...');
-        S.raw = cache.data;
-        updateLastUpdateLabel(cache.savedAt);
-        setStatus('ok');
-        renderAll(S.raw);
-        toast('📦 Data dari cache · ' + new Date(cache.savedAt).toLocaleTimeString('id-ID', {hour:'2-digit',minute:'2-digit'}), 'inf');
+      // Load cache dari n8n + localStorage
+      toast('📦 Mengecek cache...', 'inf');
+      await loadAllCacheFromStorage();
+      updateCacheGrid();
+      updateMonthBtnCache();
+      updateLastUpdate();
+
+      // Render dari cache yang sudah ada di memory
+      const allOrders = getOrdersForDisplay();
+      if (allOrders.length > 0) {
+        renderAll(allOrders);
+        toast(`📦 ${allOrders.length} order dari cache`, 'inf');
       } else {
-        // Tidak ada cache → fetch dari Shopee
-        loadData();
+        // Coba load bulan ini dari n8n
+        const now = new Date();
+        const cached = await loadMonthFromN8n(S.year, now.getMonth()+1);
+        if (cached?.orders?.length > 0) {
+          renderAll(cached.orders);
+          toast(`📦 ${cached.orders.length} order dari n8n cache`, 'inf');
+        } else {
+          toast('Pilih bulan untuk muat data', 'inf');
+        }
       }
-    } catch(e) {}
+      return;
+    } catch(e) { console.error(e); }
   }
   initCharts();
+  // Tidak ada credentials
+  openSetup();
 });
 
-// ── Config ────────────────────────────────────────────────────────
+function renderFromCache() {
+  // Kumpulkan semua order dari cache yang ada untuk tahun ini
+  const allOrders = [];
+  for (let m = 1; m <= 12; m++) {
+    const data = loadMonthCache(S.year, m);
+    if (data?.orders) allOrders.push(...data.orders);
+  }
+  if (allOrders.length > 0) {
+    renderAll(allOrders);
+    toast(`📦 ${allOrders.length} order dari cache`, 'inf');
+  } else {
+    // Tidak ada cache, sarankan fetch
+    toast('Pilih bulan untuk muat data, atau klik Refresh', 'inf');
+  }
+}
+
+function updateLastUpdate() {
+  const badge = document.getElementById('lastUpdateBadge');
+  const timeEl = document.getElementById('lastUpdateTime');
+  // Cari cache terbaru
+  let latest = 0;
+  Object.values(S.monthCache).forEach(d => { if (d.savedAt > latest) latest = d.savedAt; });
+  if (latest > 0) {
+    const d = new Date(latest);
+    timeEl.textContent = d.toLocaleDateString('id-ID',{day:'2-digit',month:'short'}) + ' ' + d.toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
+    badge.style.display = 'inline-block';
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// CACHE PANEL UI
+// ═══════════════════════════════════════════════════════════════════
+function toggleCachePanel() {
+  const p = document.getElementById('cachePanel');
+  p.classList.toggle('show');
+  updateCacheGrid();
+}
+
+function updateCacheGrid() {
+  const grid = document.getElementById('cacheGrid');
+  grid.innerHTML = '';
+  for (let m = 1; m <= 12; m++) {
+    const cached = isCacheValid(S.year, m);
+    const data = loadMonthCache(S.year, m);
+    const isActive = S.month === m;
+    const div = document.createElement('div');
+    div.className = `cache-month ${cached ? 'cached' : 'empty'} ${isActive ? 'active' : ''}`;
+    div.title = cached ? `${data?.orders?.length || 0} orders · ${new Date(data.savedAt).toLocaleString('id-ID')}` : 'Belum ada cache';
+    div.innerHTML = `<div>${MONTHS[m-1]}</div>${cached ? `<div style="font-size:9px">${data?.orders?.length||0}</div>` : '<div style="font-size:9px">—</div>'}`;
+    div.onclick = () => {
+      document.querySelectorAll('.mth').forEach(b => b.classList.remove('on'));
+      document.querySelector(`.mth[data-m="${m}"]`)?.classList.add('on');
+      setMonth(m, document.querySelector(`.mth[data-m="${m}"]`));
+    };
+    grid.appendChild(div);
+  }
+}
+
+function updateMonthBtnCache() {
+  for (let m = 1; m <= 12; m++) {
+    const btn = document.querySelector(`.mth[data-m="${m}"]`);
+    if (btn) {
+      if (isCacheValid(S.year, m)) btn.classList.add('has-cache');
+      else btn.classList.remove('has-cache');
+    }
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// CONFIG
+// ═══════════════════════════════════════════════════════════════════
 function fillModal() {
   if (!S.cfg) return;
   document.getElementById('cfg-n8n').value   = S.cfg.n8n   || 'http://localhost:5678';
@@ -594,459 +564,467 @@ function fillModal() {
 
 function saveConfig() {
   const cfg = {
-    n8n:   document.getElementById('cfg-n8n').value.trim().replace(/\/$/, ''),
+    n8n:   document.getElementById('cfg-n8n').value.trim().replace(/\/$/,''),
     pid:   document.getElementById('cfg-pid').value.trim(),
     pkey:  document.getElementById('cfg-pkey').value.trim(),
     sid:   document.getElementById('cfg-sid').value.trim(),
     token: document.getElementById('cfg-token').value.trim(),
   };
-  if (!cfg.pid || !cfg.pkey || !cfg.sid) {
-    toast('Partner ID, Partner Key, Shop ID wajib diisi', 'err'); return;
-  }
-  // Access token opsional - n8n ambil dari Static Data
+  if (!cfg.pid || !cfg.pkey || !cfg.sid) { toast('Partner ID, Key, Shop ID wajib diisi','err'); return; }
   localStorage.setItem('shopee_cfg_v2', JSON.stringify(cfg));
   S.cfg = cfg; S.isDemo = false;
   closeSetup();
-  loadData();
+  loadSelectedMonths();
 }
 
 function openSetup()  { document.getElementById('modal-bg').classList.remove('hidden'); }
 function closeSetup() { document.getElementById('modal-bg').classList.add('hidden'); }
 
 function openAuthTab() {
-  // Buka auth URL melalui n8n
-  if (!S.cfg?.n8n || !S.cfg?.pid || !S.cfg?.pkey) {
-    toast('Isi n8n URL, Partner ID, Partner Key dulu', 'err'); return;
-  }
-  const n8nUrl = `${S.cfg.n8n}/webhook/shopee-auth-url`;
-  fetch(n8nUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ partner_id: S.cfg.pid, partner_key: S.cfg.pkey, redirect: 'https://localhost' })
-  })
-  .then(r => r.json())
-  .then(d => {
-    if (d.auth_url) { window.open(d.auth_url, '_blank'); toast('Halaman login Shopee dibuka', 'inf'); }
-    else toast('Gagal generate auth URL: ' + (d.message || JSON.stringify(d)), 'err');
-  })
-  .catch(e => toast('n8n tidak bisa dihubungi: ' + e.message, 'err'));
+  if (!S.cfg?.n8n) { toast('Isi n8n URL dulu','err'); return; }
+  fetch(`${S.cfg.n8n}/webhook/shopee-auth-url`, {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({partner_id:S.cfg.pid, partner_key:S.cfg.pkey, redirect:'https://localhost'})
+  }).then(r=>r.json()).then(d=>{
+    if (d.auth_url) { window.open(d.auth_url,'_blank'); toast('Halaman login dibuka','inf'); }
+    else toast('Gagal: '+(d.message||''),'err');
+  }).catch(e=>toast('n8n error: '+e.message,'err'));
 }
 
-// ── Filter ────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════
+// FILTER
+// ═══════════════════════════════════════════════════════════════════
 function setMonth(m, btn) {
   S.month = m;
   document.querySelectorAll('.mth').forEach(b => b.classList.remove('on'));
-  btn.classList.add('on');
-  // Render dari data yang sudah ada - tidak perlu fetch ulang
-  if (S.raw) {
-    renderAll(S.raw);
+  if (btn) btn.classList.add('on');
+  updateCacheGrid();
+
+  if (m === 'all') {
+    // Semua bulan: render dari cache yang ada, fetch yang belum ada
+    loadSelectedMonths();
   } else {
-    loadData();
+    // Bulan spesifik
+    const memData = loadMonthCache(S.year, m);
+
+    if (memData?.orders?.length > 0 && isCacheValid(S.year, m)) {
+      // Ada di memory dan valid - instan
+      renderAll(memData.orders);
+      toast(`📦 ${MONTHS[m-1]} dari cache (${memData.orders.length} order)`, 'inf');
+    } else if (memData?.needLoad) {
+      // Ada di n8n tapi belum di memory
+      toast(`⬇️ Loading ${MONTHS[m-1]} dari n8n...`, 'inf');
+      loadMonthFromN8n(S.year, m).then(data => {
+        if (data?.orders?.length > 0) {
+          renderAll(data.orders);
+          toast(`📦 ${MONTHS[m-1]}: ${data.orders.length} order`, 'inf');
+          updateCacheGrid();
+        } else {
+          fetchMonth(S.year, m).then(() => renderAll(getOrdersForDisplay()));
+        }
+      });
+    } else {
+      // Belum ada cache → fetch dari Shopee
+      fetchMonth(S.year, m).then(() => renderAll(getOrdersForDisplay()));
+    }
   }
 }
 
 function onYearChange() {
   S.year = parseInt(document.getElementById('yearSel').value);
-  loadData();
-}
-
-function timeRange() {
-  const y = S.year;
-  if (S.month === 'all') {
-    return {
-      from: Math.floor(new Date(`${y}-01-01`).getTime() / 1000),
-      to:   Math.floor(new Date(`${y}-12-31T23:59:59`).getTime() / 1000)
-    };
+  loadAllCacheFromStorage();
+  updateCacheGrid();
+  updateMonthBtnCache();
+  const allOrders = getOrdersForDisplay();
+  if (allOrders.length > 0) {
+    renderAll(allOrders);
+    toast(`📦 Data ${S.year} dari cache`, 'inf');
+  } else {
+    loadSelectedMonths();
   }
-  const m = String(S.month).padStart(2, '0');
-  const last = new Date(y, S.month, 0).getDate();
-  return {
-    from: Math.floor(new Date(`${y}-${m}-01`).getTime() / 1000),
-    to:   Math.floor(new Date(`${y}-${m}-${last}T23:59:59`).getTime() / 1000)
-  };
 }
 
-// ── Fetch via n8n ─────────────────────────────────────────────────
-// ── Step 1: Kumpulkan semua SNs dengan cursor pagination ──────────
-async function fetchAllSNs(from, to) {
+function getOrdersForDisplay() {
   const allOrders = [];
-  let cursor = '';
-  let page = 0;
-  const MAX_PAGES = 100;
-
-  while (true) {
-    page++;
-    const reqBody = {
-      partner_id:   S.cfg.pid   || '2036238',
-      partner_key:  S.cfg.pkey  || '',
-      shop_id:      S.cfg.sid   || '1670690811',
-      access_token: S.cfg.token || '',
-      time_from: from,
-      time_to:   to,
-      time_range_field: 'create_time'
-    };
-    if (cursor) reqBody.cursor = cursor;
-
-    const res = await fetch(`${S.cfg.n8n}/webhook/shopee-orders`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(reqBody)
-    });
-
-    if (!res.ok) throw new Error(`HTTP ${res.status} dari n8n (list)`);
-    const data = await res.json();
-    if (!data.success) throw new Error(data.message || 'Error list');
-
-    // shopee-orders return orders langsung (sudah include detail)
-    const pageOrders = data.orders || [];
-    if (pageOrders.length) allOrders.push(...pageOrders);
-
-    if (data.hasMore && data.nextCursor && page < MAX_PAGES) {
-      cursor = data.nextCursor;
-      toast(`📋 Halaman ${page+1}... (${allOrders.length} order)`, 'inf');
-    } else {
-      break;
+  if (S.month === 'all') {
+    for (let m = 1; m <= 12; m++) {
+      const data = loadMonthCache(S.year, m);
+      if (data?.orders) allOrders.push(...data.orders);
     }
+  } else {
+    const data = loadMonthCache(S.year, S.month);
+    if (data?.orders) allOrders.push(...data.orders);
   }
   return allOrders;
 }
 
-// ── Main fetch: gunakan shopee-orders yang sudah include detail ────
-async function fetchChunk(from, to) {
-  const orders = await fetchAllSNs(from, to);
-  return { success: true, orders };
+// ═══════════════════════════════════════════════════════════════════
+// FETCH
+// ═══════════════════════════════════════════════════════════════════
+
+// Fetch 1 hari dari n8n
+async function fetchDay(year, month, day) {
+  const d1 = new Date(year, month-1, day, 0, 0, 0);
+  const d2 = new Date(year, month-1, day, 23, 59, 59);
+  const from = Math.floor(d1.getTime()/1000);
+  const to   = Math.floor(d2.getTime()/1000);
+
+  const body = {
+    partner_id:   S.cfg.pid   || '2036238',
+    partner_key:  S.cfg.pkey  || '',
+    shop_id:      S.cfg.sid   || '1670690811',
+    access_token: S.cfg.token || '',
+    time_from: from, time_to: to,
+    time_range_field: 'create_time'
+  };
+
+  const res = await fetch(`${S.cfg.n8n}/webhook/shopee-orders`, {
+    method:'POST', mode:'cors',
+    headers:{'Content-Type':'application/json','Accept':'application/json'},
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) throw new Error(`HTTP ${res.status}`);
+  const data = await res.json();
+  if (!data.success) throw new Error(data.message || 'Error dari Shopee');
+  return data.orders || [];
 }
 
-async function loadData() {
-  if (S.isDemo) { renderAll(S.raw); return; }
+// Fetch 1 bulan penuh (per hari)
+async function fetchMonth(year, month) {
+  if (!S.cfg) { openSetup(); return []; }
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const allOrders = [];
+  let done = 0;
+
+  setProgress(0, `Memuat ${MONTHS[month-1]} ${year}...`);
+
+  for (let day = 1; day <= daysInMonth; day++) {
+    try {
+      const orders = await fetchDay(year, month, day);
+      allOrders.push(...orders);
+      done++;
+      const pct = Math.round((done/daysInMonth)*100);
+      setProgress(pct, `${MONTHS[month-1]} ${year}: ${done}/${daysInMonth} hari · ${allOrders.length} order`);
+    } catch(e) {
+      console.error(`Error day ${day}:`, e.message);
+      if (e.message.includes('credentials') || e.message.includes('token') || e.message.includes('403')) {
+        hideProgress();
+        toast('⚠️ Token expired — generate token baru di ⚙️', 'err');
+        throw e;
+      }
+    }
+  }
+
+  // Simpan ke n8n cache (persistent)
+  await saveMonthCache(year, month, allOrders);
+  hideProgress();
+  toast(`✅ ${MONTHS[month-1]} ${year}: ${allOrders.length} order`, 'ok');
+  return allOrders;
+}
+
+// Load bulan yang dipilih (semua atau spesifik)
+async function loadSelectedMonths() {
   if (!S.cfg) { openSetup(); return; }
+  setSyncing(true);
 
-  setSyncing(true); setStatus('loading');
+  if (S.month === 'all') {
+    // Fetch semua bulan yang belum ada cache
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+    const maxMonth = (S.year === currentYear) ? currentMonth : 12;
+    let allOrders = [];
 
-  try {
-    const y = S.year;
-    // Selalu fetch full year, split per bulan (tiap bulan = 2 chunk maks 15 hari)
-    // agar dapat semua data dan month detection akurat
-    const allOrders = [];
-    const statusCount = {};
-    const productMap = {};
-    const monthlyData = {};
-
-    // Selalu fetch SEMUA bulan sekaligus (1-12)
-    // Filter lokal saat user pilih bulan tertentu - tidak perlu fetch ulang
-    const months = [];
-    for (let m = 1; m <= 12; m++) months.push(m);
-
-    // Helper: timestamp WIB-safe (Indonesia UTC+7)
-    // Shopee server pakai UTC, jadi kita perlu cover dari jam 17:00 hari sebelumnya
-    // sampai jam 16:59:59 hari berikutnya untuk capture semua order WIB
-    function chunkTs(year, month, startDay, endDay) {
-      const daysInMonth = new Date(year, month, 0).getDate();
-      const ed = Math.min(endDay, daysInMonth);
-      return {
-        // Mulai dari jam 00:00 WIB = jam 17:00 UTC hari sebelumnya
-        from: Math.floor(new Date(year, month-1, startDay, 0, 0, 0).getTime() / 1000),
-        to:   Math.floor(new Date(year, month-1, ed, 23, 59, 59).getTime() / 1000)
-      };
-    }
-
-    let totalFetched = 0;
-    for (const m of months) {
-      const daysInMonth = new Date(y, m, 0).getDate();
-      const chunks = [];
-      // Split per 1 hari - toko ini bisa 90+ order/hari di periode ramai
-      // Shopee max 100 order/request, 1 hari = max ~50 order = aman
-      for (let day = 1; day <= daysInMonth; day++) {
-        chunks.push(chunkTs(y, m, day, day));
+    for (let m = 1; m <= maxMonth; m++) {
+      if (!isCacheValid(S.year, m)) {
+        try {
+          await fetchMonth(S.year, m);
+        } catch(e) { break; }
       }
-
-      for (const chunk of chunks) {
-        const data = await fetchChunk(chunk.from, chunk.to);
-        if (!data.orders?.length) continue;
-
-        for (const o of data.orders) {
-          allOrders.push(o);
-          totalFetched++;
-
-          // Status count (semua order)
-          const s = o.order_status || 'UNKNOWN';
-          statusCount[s] = (statusCount[s] || 0) + 1;
-
-          // Monthly + product (hanya completed/shipped)
-          const isGood = ['COMPLETED','SHIPPED','TO_CONFIRM_RECEIVE','READY_TO_SHIP','PROCESSED','IN_CANCEL'].includes(o.order_status); // TO_RETURN dikecualikan
-          // Gunakan bulan dari parameter (bukan dari timestamp) agar akurat
-          const mk = `${y}-${String(m).padStart(2,'0')}`;
-          if (!monthlyData[mk]) monthlyData[mk] = {month:mk, omset:0, orders:0, quantity:0, prods:new Set()};
-
-          if (isGood) {
-            // Gunakan total_amount (sudah include ongkir, voucher, dll) untuk omset
-            monthlyData[mk].omset  += parseFloat(o.total_amount || 0);
-            monthlyData[mk].orders += 1;
-          }
-          if (o.order_status === 'CANCELLED') monthlyData[mk].cancelled = (monthlyData[mk].cancelled||0) + 1;
-          if (o.order_status === 'TO_RETURN')  monthlyData[mk].returned  = (monthlyData[mk].returned||0)  + 1;
-
-          for (const it of (o.items || [])) {
-            const qty   = it.qty || 1;
-            const price = parseFloat(it.price || 0);
-            const name  = it.name || 'Unknown';
-            if (isGood) {
-              monthlyData[mk].quantity += qty;
-              monthlyData[mk].prods.add(name);
-            }
-            // Ranking produk tetap pakai qty*price (harga produk saja)
-            if (!productMap[name]) productMap[name] = {name, sku:it.sku||'-', qty:0, revenue:0};
-            if (isGood) { productMap[name].qty += qty; productMap[name].revenue += qty * price; }
-          }
-        }
-      }
-
-      // Update status sementara
-      toast(`📦 Memuat... ${totalFetched} order dari ${MONTHS[m-1]}`, 'inf');
+      const data = loadMonthCache(S.year, m);
+      if (data?.orders) allOrders.push(...data.orders);
     }
-
-    const monthly = Object.values(monthlyData)
-      .map(m => ({month:m.month, omset:m.omset, orders:m.orders, quantity:m.quantity, products:m.prods.size}))
-      .sort((a,b) => a.month.localeCompare(b.month));
-
-    const prods = Object.values(productMap);
-
-    S.raw = {
-      success: true,
-      totals: {
-        omset:    monthly.reduce((s,m)=>s+m.omset, 0),
-        orders:   monthly.reduce((s,m)=>s+m.orders, 0),
-        quantity: monthly.reduce((s,m)=>s+m.quantity, 0),
-        products: prods.length
-      },
-      monthly,
-      topByRevenue: [...prods].sort((a,b)=>b.revenue-a.revenue).slice(0,10),
-      topByQty:     [...prods].sort((a,b)=>b.qty-a.qty).slice(0,10),
-      statusCount,
-      orders: allOrders
-    };
-
-    // Simpan ke cache
-    saveCache(S.raw);
-    renderAll(S.raw);
-    setStatus('ok');
-    toast(`✅ ${totalFetched} pesanan dimuat · tersimpan di cache`, 'ok');
-
-  } catch(e) {
-    setStatus('err');
-    toast('⚠️ ' + e.message, 'err');
-    console.error(e);
+    renderAll(allOrders);
+  } else {
+    // Fetch bulan spesifik
+    try {
+      await fetchMonth(S.year, S.month);
+      const allOrders = getOrdersForDisplay();
+      renderAll(allOrders);
+    } catch(e) {}
   }
 
   setSyncing(false);
+  updateCacheGrid();
 }
 
-// ── Render ────────────────────────────────────────────────────────
-function renderAll(data) {
-  if (!data) return;
+// Refresh: hanya fetch hari ini & kemarin untuk bulan ini
+async function refreshData() {
+  if (!S.cfg) { openSetup(); return; }
+  setSyncing(true);
 
-  // Filter data by month if needed
-  let orders = data.orders || [];
-  let monthly = data.monthly || [];
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth() + 1;
 
+  // Fetch 2 hari terakhir saja
+  setProgress(0, 'Refresh data terbaru...');
+  const newOrders = [];
+  try {
+    for (let d = 0; d <= 1; d++) {
+      const date = new Date(now);
+      date.setDate(date.getDate() - d);
+      const y = date.getFullYear(), m = date.getMonth()+1, day = date.getDate();
+      const orders = await fetchDay(y, m, day);
+      newOrders.push(...orders);
+      setProgress(d===0?50:100, `Memuat ${day}/${m}...`);
+    }
+
+    // Merge ke cache bulan ini
+    const existing = loadMonthCache(year, month);
+    const existingSNs = new Set((existing?.orders || []).map(o => o.order_sn));
+    const merged = [...(existing?.orders || [])];
+
+    // Update status order yang sudah ada + tambah yang baru
+    newOrders.forEach(o => {
+      const idx = merged.findIndex(e => e.order_sn === o.order_sn);
+      if (idx >= 0) merged[idx] = o; // update status
+      else if (!existingSNs.has(o.order_sn)) merged.push(o); // tambah baru
+    });
+
+    saveMonthCache(year, month, merged);
+    toast(`✅ ${newOrders.length} order terbaru diupdate`, 'ok');
+
+  } catch(e) {
+    toast('⚠️ Refresh gagal: '+e.message, 'err');
+  }
+
+  hideProgress();
+  setSyncing(false);
+  const allOrders = getOrdersForDisplay();
+  renderAll(allOrders);
+  updateCacheGrid();
+  updateMonthBtnCache();
+  updateLastUpdate();
+}
+
+// Fetch semua bulan sekaligus
+async function fetchAllMonths() {
+  if (!S.cfg) { openSetup(); return; }
+  if (!confirm('Fetch semua bulan akan memakan waktu beberapa menit. Lanjutkan?')) return;
+  document.getElementById('cachePanel').classList.remove('show');
+  S.month = 'all';
+  document.querySelectorAll('.mth').forEach(b => b.classList.remove('on'));
+  document.querySelector('.mth[data-m="all"]')?.classList.add('on');
+  // Hapus cache dulu agar fetch ulang semua
+  const keys = Object.keys(localStorage).filter(k => k.startsWith(`shopee_month_${S.year}_`));
+  keys.forEach(k => localStorage.removeItem(k));
+  S.monthCache = {};
+  await loadSelectedMonths();
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// AGGREGATE & RENDER
+// ═══════════════════════════════════════════════════════════════════
+function aggregate(orders) {
+  const monthlyData = {}, productMap = {}, statusCount = {};
+
+  for (const order of orders) {
+    const date = new Date(order.create_time * 1000);
+    const mk = `${date.getFullYear()}-${String(date.getMonth()+1).padStart(2,'0')}`;
+    if (!monthlyData[mk]) monthlyData[mk] = {month:mk, omset:0, orders:0, quantity:0, cancelled:0, returned:0, prods:new Set()};
+
+    const s = order.order_status || 'UNKNOWN';
+    statusCount[s] = (statusCount[s]||0) + 1;
+
+    const isValid    = VALID_STATUS.has(s);
+    const isCancelled= s === 'CANCELLED';
+    const isReturned = s === 'TO_RETURN';
+
+    if (isValid) {
+      monthlyData[mk].omset   += parseFloat(order.total_amount || 0);
+      monthlyData[mk].orders  += 1;
+    }
+    if (isCancelled) monthlyData[mk].cancelled++;
+    if (isReturned)  monthlyData[mk].returned++;
+
+    for (const item of (order.items || [])) {
+      const qty   = item.qty   || 1;
+      const price = parseFloat(item.price || 0);
+      const name  = item.name  || 'Unknown';
+      if (isValid) {
+        monthlyData[mk].quantity += qty;
+        monthlyData[mk].prods.add(name);
+      }
+      if (!productMap[name]) productMap[name] = {name, sku:item.sku||'-', qty:0, revenue:0};
+      if (isValid) { productMap[name].qty += qty; productMap[name].revenue += qty * price; }
+    }
+  }
+
+  const monthly = Object.values(monthlyData)
+    .map(m => ({...m, products: m.prods.size}))
+    .sort((a,b) => a.month.localeCompare(b.month));
+
+  const prods = Object.values(productMap);
+  return {
+    totals: {
+      omset:    monthly.reduce((s,m)=>s+m.omset,    0),
+      orders:   monthly.reduce((s,m)=>s+m.orders,   0),
+      quantity: monthly.reduce((s,m)=>s+m.quantity,  0),
+      products: prods.length,
+      cancelled:monthly.reduce((s,m)=>s+m.cancelled, 0),
+      returned: monthly.reduce((s,m)=>s+m.returned,  0),
+    },
+    monthly,
+    topByRevenue: [...prods].sort((a,b)=>b.revenue-a.revenue).slice(0,10),
+    topByQty:     [...prods].sort((a,b)=>b.qty-a.qty).slice(0,10),
+    statusCount,
+    orders,
+  };
+}
+
+function renderAll(orders) {
+  // Filter berdasarkan bulan yang dipilih
+  let filtered = orders;
   if (S.month !== 'all') {
-    const monthKey = `${S.year}-${String(S.month).padStart(2,'0')}`;
-    orders = orders.filter(o => {
+    filtered = orders.filter(o => {
       const d = new Date(o.create_time * 1000);
       return d.getFullYear() === S.year && (d.getMonth()+1) === parseInt(S.month);
     });
-    monthly = monthly.filter(m => m.month === monthKey);
+  } else {
+    filtered = orders.filter(o => new Date(o.create_time*1000).getFullYear() === S.year);
   }
 
-  // Recalculate totals from filtered orders
-  let omset = 0, orderCount = 0, qty = 0;
-  const prodMap = {};
-  const statusCount = {};
-
-  orders.forEach(o => {
-    const isGood = ['COMPLETED','SHIPPED','TO_CONFIRM_RECEIVE','READY_TO_SHIP','PROCESSED','IN_CANCEL'].includes(o.order_status); // TO_RETURN dikecualikan
-    statusCount[o.order_status] = (statusCount[o.order_status]||0)+1;
-    if (!isGood) return;
-    omset += parseFloat(o.total_amount || 0);
-    orderCount++;
-    (o.items || []).forEach(it => {
-      const q = it.qty || 1;
-      const p = parseFloat(it.price || 0);
-      qty += q;
-      if (!prodMap[it.name]) prodMap[it.name] = { name: it.name, sku: it.sku||'-', qty:0, revenue:0 };
-      prodMap[it.name].qty     += q;
-      prodMap[it.name].revenue += q * p;
-    });
-  });
-
-  const products = Object.keys(prodMap).length;
+  const data = aggregate(filtered);
+  const { totals, monthly, topByRevenue, topByQty, statusCount } = data;
 
   // KPI
-  document.getElementById('kOmset').textContent    = fmtRp(omset);
-  document.getElementById('kOrders').textContent   = orderCount.toLocaleString('id');
-  document.getElementById('kProducts').textContent = products.toLocaleString('id');
-  document.getElementById('kQty').textContent      = qty.toLocaleString('id');
+  document.getElementById('kOmset').textContent    = fmtRp(totals.omset);
+  document.getElementById('kOrders').textContent   = totals.orders.toLocaleString('id');
+  document.getElementById('kProducts').textContent = totals.products.toLocaleString('id');
+  document.getElementById('kQty').textContent      = totals.quantity.toLocaleString('id');
 
   const period = S.month === 'all' ? `Tahun ${S.year}` : `${MONTHS[S.month-1]} ${S.year}`;
-  document.getElementById('kOmsetNote').textContent = period;
+  document.getElementById('kOmsetNote').textContent  = period;
+  document.getElementById('kOrdersNote').textContent = `${totals.cancelled} batal · ${totals.returned} retur`;
 
   // Charts
-  renderOmsetChart(monthly, orders);
+  renderOmsetChart(monthly, filtered);
   renderStatusChart(statusCount);
 
-  // Top products
-  const byRev = Object.values(prodMap).sort((a,b)=>b.revenue-a.revenue).slice(0,8);
-  const byQty = Object.values(prodMap).sort((a,b)=>b.qty-a.qty).slice(0,8);
-  renderRankList('topRevList', byRev, 'revenue', fmtRp);
-  renderRankList('topQtyList', byQty, 'qty', v => v.toLocaleString('id') + ' pcs');
+  // Rankings
+  renderRankList('topRevList', topByRevenue, 'revenue', fmtRp);
+  renderRankList('topQtyList', topByQty,     'qty',     v=>v.toLocaleString('id')+' pcs');
 
   // Table
-  document.getElementById('tblSub').textContent = `${orders.length} pesanan · ${period}`;
-  renderTable(orders);
+  document.getElementById('tblSub').textContent = `${filtered.length} pesanan · ${period}`;
+  renderTable(filtered);
 }
 
-// ── Charts ────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════
+// CHARTS
+// ═══════════════════════════════════════════════════════════════════
 function initCharts() {
   S.charts.omset = new Chart(document.getElementById('chartOmset').getContext('2d'), {
-    type: 'bar',
-    data: { labels: [], datasets: [] },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      plugins: { legend: { display: false } },
-      scales: {
-        y: { ticks: { callback: v => fmtRpShort(v), font: { size: 11 } }, grid: { color: '#f3f4f6' } },
-        x: { ticks: { font: { size: 11 } }, grid: { display: false } }
-      }
-    }
+    type:'bar', data:{labels:[],datasets:[]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},
+      scales:{y:{ticks:{callback:v=>fmtRpShort(v),font:{size:11}},grid:{color:'#f3f4f6'}},x:{ticks:{font:{size:11}},grid:{display:false}}}}
   });
-
   S.charts.status = new Chart(document.getElementById('chartStatus').getContext('2d'), {
-    type: 'doughnut',
-    data: { labels: [], datasets: [] },
-    options: {
-      responsive: true, maintainAspectRatio: false,
-      cutout: '68%',
-      plugins: { legend: { position: 'bottom', labels: { font: { size: 11 }, padding: 10, boxWidth: 12 } } }
-    }
+    type:'doughnut', data:{labels:[],datasets:[]},
+    options:{responsive:true,maintainAspectRatio:false,cutout:'68%',
+      plugins:{legend:{position:'bottom',labels:{font:{size:11},padding:10,boxWidth:12}}}}
   });
 }
 
 function renderOmsetChart(monthly, orders) {
   const ch = S.charts.omset;
   if (S.month === 'all') {
-    // Monthly bars
     const vals = Array(12).fill(0);
-    monthly.forEach(m => {
-      const idx = parseInt(m.month.split('-')[1]) - 1;
-      vals[idx] = m.omset;
-    });
+    monthly.forEach(m => { const idx = parseInt(m.month.split('-')[1])-1; vals[idx] = m.omset; });
     const max = Math.max(...vals);
     ch.data.labels = MONTHS;
-    ch.data.datasets = [{
-      data: vals,
-      backgroundColor: vals.map(v => v === max ? '#ee4d2d' : '#fecaca'),
-      borderRadius: 6, borderSkipped: false
-    }];
-    document.getElementById('chartSubOmset').textContent = `Revenue per bulan — Tahun ${S.year}`;
+    ch.data.datasets = [{data:vals,backgroundColor:vals.map(v=>v===max?'#ee4d2d':'#fecaca'),borderRadius:6,borderSkipped:false}];
+    document.getElementById('chartSubOmset').textContent = `Revenue per bulan — ${S.year}`;
   } else {
-    // Daily bars
     const daysInMonth = new Date(S.year, S.month, 0).getDate();
     const vals = Array(daysInMonth).fill(0);
     orders.forEach(o => {
-      if (!['COMPLETED','SHIPPED','TO_CONFIRM_RECEIVE'].includes(o.order_status)) return;
-      const d = new Date(o.create_time * 1000).getDate();
-      vals[d-1] += parseFloat(o.total_amount || 0);
+      if (!VALID_STATUS.has(o.order_status)) return;
+      const d = new Date(o.create_time*1000).getDate();
+      vals[d-1] += parseFloat(o.total_amount||0);
     });
-    ch.data.labels = Array.from({length: daysInMonth}, (_,i) => i+1);
-    ch.data.datasets = [{
-      data: vals,
-      backgroundColor: '#fecaca',
-      borderColor: '#ee4d2d', borderWidth: 1.5,
-      borderRadius: 4, borderSkipped: false
-    }];
+    ch.data.labels = Array.from({length:daysInMonth},(_,i)=>i+1);
+    ch.data.datasets = [{data:vals,backgroundColor:'#fecaca',borderColor:'#ee4d2d',borderWidth:1.5,borderRadius:4,borderSkipped:false}];
     document.getElementById('chartSubOmset').textContent = `Revenue per hari — ${MONTHS[S.month-1]} ${S.year}`;
   }
   ch.update();
 }
 
 function renderStatusChart(statusCount) {
-  const colors = {
-    COMPLETED:'#10b981', SHIPPED:'#3b82f6', TO_CONFIRM_RECEIVE:'#0d9488',
-    PROCESSING:'#f59e0b', IN_CANCEL:'#f97316', CANCELLED:'#ef4444',
-    UNPAID:'#8b5cf6', UNKNOWN:'#9ca3af'
-  };
+  const colors = {COMPLETED:'#10b981',SHIPPED:'#3b82f6',TO_CONFIRM_RECEIVE:'#0d9488',READY_TO_SHIP:'#6366f1',PROCESSED:'#f59e0b',IN_CANCEL:'#f97316',CANCELLED:'#ef4444',TO_RETURN:'#dc2626',UNKNOWN:'#9ca3af'};
   const labels = Object.keys(statusCount);
-  S.charts.status.data.labels   = labels.map(l => l.replace(/_/g,' '));
-  S.charts.status.data.datasets = [{
-    data: labels.map(l => statusCount[l]),
-    backgroundColor: labels.map(l => colors[l] || '#9ca3af'),
-    borderWidth: 2, borderColor: '#fff'
-  }];
+  S.charts.status.data.labels   = labels.map(l=>l.replace(/_/g,' '));
+  S.charts.status.data.datasets = [{data:labels.map(l=>statusCount[l]),backgroundColor:labels.map(l=>colors[l]||'#9ca3af'),borderWidth:2,borderColor:'#fff'}];
   S.charts.status.update();
 }
 
-// ── Rank Lists ────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════
+// RANK LISTS
+// ═══════════════════════════════════════════════════════════════════
 function renderRankList(elId, items, valueKey, fmt) {
   const el = document.getElementById(elId);
-  if (!items.length) {
-    el.innerHTML = '<li class="empty-msg"><div class="eico">📭</div>Belum ada data</li>'; return;
-  }
+  if (!items.length) { el.innerHTML='<li class="empty-msg"><div class="eico">📭</div>Belum ada data</li>'; return; }
   const max = items[0][valueKey] || 1;
-  el.innerHTML = items.map((p, i) => {
+  el.innerHTML = items.map((p,i) => {
     const rnCls = ['rn-1','rn-2','rn-3'][i] || 'rn-x';
-    const pct = ((p[valueKey]/max)*100).toFixed(0);
-    return `
-      <li class="rank-row">
-        <div class="rn ${rnCls}">${i+1}</div>
-        <div class="ri">
-          <div class="ri-name">${p.name}</div>
-          <div class="ri-sku">${p.sku}</div>
-        </div>
-        <div class="rb"><div class="rb-track"><div class="rb-fill" style="width:${pct}%"></div></div></div>
-        <div class="rv">${fmt(p[valueKey])}</div>
-      </li>`;
+    return `<li class="rank-row">
+      <div class="rn ${rnCls}">${i+1}</div>
+      <div class="ri"><div class="ri-name">${p.name}</div><div class="ri-sku">${p.sku}</div></div>
+      <div class="rb"><div class="rb-track"><div class="rb-fill" style="width:${((p[valueKey]/max)*100).toFixed(0)}%"></div></div></div>
+      <div class="rv">${fmt(p[valueKey])}</div>
+    </li>`;
   }).join('');
 }
 
-// ── Table ─────────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════
+// TABLE
+// ═══════════════════════════════════════════════════════════════════
 function renderTable(orders) {
   const el = document.getElementById('tblWrap');
-  if (!orders.length) {
-    el.innerHTML = '<div class="empty-msg"><div class="eico">📭</div>Tidak ada pesanan di periode ini</div>'; return;
-  }
-  const badgeClass = s => ({
-    COMPLETED:'b-done', SHIPPED:'b-ship', TO_CONFIRM_RECEIVE:'b-ship',
-    PROCESSING:'b-proc', IN_CANCEL:'b-cancel', CANCELLED:'b-cancel'
-  }[s] || 'b-default');
+  if (!orders.length) { el.innerHTML='<div class="empty-msg"><div class="eico">📭</div>Tidak ada pesanan</div>'; return; }
+  const bc = s => ({COMPLETED:'b-done',SHIPPED:'b-ship',TO_CONFIRM_RECEIVE:'b-ship',READY_TO_SHIP:'b-ship',PROCESSED:'b-proc',IN_CANCEL:'b-proc',CANCELLED:'b-cancel',TO_RETURN:'b-cancel'}[s]||'b-default');
 
-  const rows = orders.slice(0, 100).map(o => {
-    const dt = new Date(o.create_time * 1000).toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'});
+  // Sort terbaru dulu
+  const sorted = [...orders].sort((a,b) => b.create_time - a.create_time);
+
+  const rows = sorted.slice(0,200).map(o => {
+    const dt = new Date(o.create_time*1000).toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'});
     const first = o.items?.[0] || {};
-    const tqty = (o.items || []).reduce((s,i)=>s+(i.qty||1),0);
-    const extra = (o.items||[]).length > 1 ? `<div style="font-size:10px;color:var(--sub);">+${o.items.length-1} lainnya</div>` : '';
+    const tqty = (o.items||[]).reduce((s,i)=>s+(i.qty||1),0);
+    const extra = (o.items||[]).length>1 ? `<div style="font-size:10px;color:var(--sub)">+${o.items.length-1} lainnya</div>` : '';
     return `<tr>
-      <td><div class="order-sn">${o.order_sn}</div><div style="font-size:11px;color:var(--sub);margin-top:2px;">${dt}</div></td>
+      <td><div class="order-sn">${o.order_sn}</div><div style="font-size:11px;color:var(--sub);margin-top:2px">${dt}</div></td>
       <td><div class="pname">${first.name||'-'}</div><div class="psku">${first.sku||'-'}</div>${extra}</td>
-      <td style="text-align:center;font-weight:700;">${tqty}</td>
-      <td><span class="badge ${badgeClass(o.order_status)}">${(o.order_status||'-').replace(/_/g,' ')}</span></td>
-      <td style="font-weight:700;">${fmtRp(o.total_amount||0)}</td>
+      <td style="text-align:center;font-weight:700">${tqty}</td>
+      <td><span class="badge ${bc(o.order_status)}">${(o.order_status||'-').replace(/_/g,' ')}</span></td>
+      <td style="font-weight:700">${fmtRp(o.total_amount||0)}</td>
     </tr>`;
   }).join('');
 
   el.innerHTML = `<table>
-    <thead><tr>
-      <th>Order / Tanggal</th><th>Produk</th>
-      <th style="text-align:center">Qty</th><th>Status</th><th>Total</th>
-    </tr></thead>
+    <thead><tr><th>Order / Tanggal</th><th>Produk</th><th style="text-align:center">Qty</th><th>Status</th><th>Total</th></tr></thead>
     <tbody>${rows}</tbody>
   </table>
-  ${orders.length > 100 ? `<div style="text-align:center;padding:12px;font-size:12px;color:var(--sub);">Menampilkan 100 dari ${orders.length} pesanan</div>` : ''}`;
+  ${orders.length>200?`<div style="text-align:center;padding:12px;font-size:12px;color:var(--sub)">Menampilkan 200 dari ${orders.length} order</div>`:''}`;
 }
 
-// ── Export CSV ────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════
+// EXPORT CSV
+// ═══════════════════════════════════════════════════════════════════
 function exportCSV() {
-  const orders = S.raw?.orders || [];
-  if (!orders.length) { toast('Tidak ada data', 'err'); return; }
+  const orders = getOrdersForDisplay();
+  if (!orders.length) { toast('Tidak ada data','err'); return; }
   const head = ['Order SN','Tanggal','Produk','SKU','Qty','Status','Total (Rp)'];
   const rows = [];
   orders.forEach(o => {
@@ -1055,74 +1033,58 @@ function exportCSV() {
       rows.push([o.order_sn, dt, it.name||'-', it.sku||'-', it.qty||1, o.order_status||'-', o.total_amount||0]);
     });
   });
-  const csv = [head, ...rows].map(r => r.map(v=>`"${v}"`).join(',')).join('\n');
-  const a = Object.assign(document.createElement('a'), {
-    href: URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'})),
-    download: `shopee_${S.year}_${S.month}.csv`
-  });
+  const csv = [head,...rows].map(r=>r.map(v=>`"${v}"`).join(',')).join('\n');
+  const a = Object.assign(document.createElement('a'),{href:URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'})),download:`shopee_${S.year}_${S.month}.csv`});
   a.click();
-  toast('✅ CSV didownload', 'ok');
+  toast('✅ CSV didownload','ok');
 }
 
-// ── Demo Data ─────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════
+// DEMO DATA
+// ═══════════════════════════════════════════════════════════════════
 function loadDemo() {
   S.isDemo = true; closeSetup();
   const prods = [
-    {name:'Sepatu Sneakers Premium',sku:'SS-001',price:285000},
-    {name:'Tas Ransel Canvas',      sku:'TR-002',price:195000},
-    {name:'Kaos Polos Cotton',      sku:'KP-003',price:75000},
-    {name:'Celana Jeans Slim',      sku:'CJ-004',price:245000},
-    {name:'Jaket Hoodie Fleece',    sku:'JH-005',price:320000},
-    {name:'Sandal Kulit Casual',    sku:'SK-006',price:145000},
-    {name:'Kemeja Flanel',          sku:'KF-007',price:185000},
-    {name:'Topi Baseball',          sku:'TB-008',price:65000},
+    {name:'Toples Tabung PET 1200ml',sku:'Cylinder PET',price:6500},
+    {name:'Botol Saos 250ml',sku:'Botol Saos 1',price:8500},
+    {name:'Topero Square 20L',sku:'Topero Square',price:53000},
+    {name:'Botol PET Almond 250ml',sku:'Botol PET Almond',price:1600},
+    {name:'Botol PET Minyak',sku:'Botol PET Minyak',price:2500},
   ];
-  const statuses = ['COMPLETED','COMPLETED','COMPLETED','SHIPPED','SHIPPED','PROCESSING','CANCELLED'];
-  const orders = [];
+  const statuses = ['COMPLETED','COMPLETED','COMPLETED','SHIPPED','PROCESSED','CANCELLED'];
+  const allOrders = [];
   const y = S.year;
-  for (let m=1;m<=12;m++) {
-    const n = Math.floor(Math.random()*40)+20;
-    for (let o=0;o<n;o++) {
-      const day = Math.floor(Math.random()*28)+1;
-      const date = new Date(y,m-1,day);
-      const prod = prods[Math.floor(Math.random()*prods.length)];
-      const qty  = Math.floor(Math.random()*3)+1;
-      const st   = statuses[Math.floor(Math.random()*statuses.length)];
-      orders.push({
-        order_sn: `DEMO${y}${String(m).padStart(2,'0')}${String(o).padStart(4,'0')}`,
-        create_time: Math.floor(date.getTime()/1000),
-        order_status: st,
-        total_amount: prod.price * qty,
-        items: [{ name:prod.name, sku:prod.sku, qty, price:prod.price }]
-      });
+  for (let m=1;m<=6;m++) {
+    const orders = [];
+    const daysInMonth = new Date(y,m,0).getDate();
+    for (let d=1;d<=daysInMonth;d++) {
+      const n = Math.floor(Math.random()*5)+2;
+      for (let o=0;o<n;o++) {
+        const prod = prods[Math.floor(Math.random()*prods.length)];
+        const qty  = Math.floor(Math.random()*10)+1;
+        const st   = statuses[Math.floor(Math.random()*statuses.length)];
+        const ts   = Math.floor(new Date(y,m-1,d,Math.floor(Math.random()*12)+8).getTime()/1000);
+        orders.push({order_sn:`DEMO${y}${String(m).padStart(2,'0')}${String(d).padStart(2,'0')}${String(o).padStart(2,'0')}`,create_time:ts,order_status:st,total_amount:st==='CANCELLED'?0:prod.price*qty+5000,buyer_username:`buyer_${Math.floor(Math.random()*999)}`,items:[{name:prod.name,sku:prod.sku,qty,price:prod.price}]});
+      }
     }
+    saveMonthCache(y, m, orders);
+    allOrders.push(...orders);
   }
-
-  // Pre-aggregate monthly
-  const mmap = {};
-  orders.forEach(o => {
-    const d = new Date(o.create_time*1000);
-    const mk = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-    if (!mmap[mk]) mmap[mk] = { month:mk, omset:0, orders:0, quantity:0, products:new Set() };
-    if (['COMPLETED','SHIPPED'].includes(o.order_status)) {
-      mmap[mk].omset += o.total_amount;
-      mmap[mk].orders++;
-      o.items.forEach(it => { mmap[mk].quantity += it.qty; mmap[mk].products.add(it.name); });
-    }
-  });
-  const monthly = Object.values(mmap).map(m=>({...m,products:m.products.size})).sort((a,b)=>a.month.localeCompare(b.month));
-
-  S.raw = { success:true, orders, monthly };
   setStatus('ok');
-  renderAll(S.raw);
-  toast('📊 Data demo dimuat', 'inf');
+  updateCacheGrid();
+  updateMonthBtnCache();
+  updateLastUpdate();
+  renderAll(allOrders);
+  toast('📊 Data demo dimuat','inf');
 }
 
-// ── Helpers ───────────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════
+// HELPERS
+// ═══════════════════════════════════════════════════════════════════
 function fmtRp(n) {
   n = parseFloat(n)||0;
-  if (n>=1e9) return 'Rp '+(n/1e9).toFixed(1)+'M';
-  if (n>=1e6) return 'Rp '+(n/1e6).toFixed(1)+'jt';
+  if (n>=1e9) return 'Rp '+(n/1e9).toFixed(2)+'M';
+  if (n>=1e6) return 'Rp '+(n/1e6).toFixed(2)+'jt';
   if (n>=1e3) return 'Rp '+(n/1e3).toFixed(0)+'rb';
   return 'Rp '+n.toFixed(0);
 }
@@ -1136,14 +1098,23 @@ function fmtRpShort(n) {
 function setSyncing(on) {
   const btn = document.getElementById('refreshBtn');
   btn.disabled = on;
-  btn.innerHTML = on ? '<span style="display:inline-block;animation:spin .7s linear infinite">⏳</span> Memuat…' : '🔄 Refresh';
+  btn.innerHTML = on ? '⏳ Loading...' : '🔄 Refresh';
 }
 
 function setStatus(s) {
   const dot = document.getElementById('dot');
   const lbl = document.getElementById('statusLabel');
-  dot.className = 'dot' + (s==='ok'?' ok':s==='err'?' err':'');
-  lbl.textContent = s==='ok' ? 'Terhubung' : s==='err' ? 'Gagal' : 'Memuat…';
+  dot.className = 'dot'+(s==='ok'?' ok':s==='err'?' err':'');
+  lbl.textContent = s==='ok'?'Terhubung':s==='err'?'Error':'Memuat...';
+}
+
+function setProgress(pct, label) {
+  document.getElementById('progressWrap').style.display = 'block';
+  document.getElementById('progressBar').style.width = pct+'%';
+  document.getElementById('progressLabel').textContent = label;
+}
+function hideProgress() {
+  document.getElementById('progressWrap').style.display = 'none';
 }
 
 function toast(msg, type='inf') {
@@ -1151,7 +1122,147 @@ function toast(msg, type='inf') {
   el.textContent = msg;
   el.className = `toast show t-${type}`;
   clearTimeout(el._t);
-  el._t = setTimeout(() => el.classList.remove('show'), 3000);
+  el._t = setTimeout(() => el.classList.remove('show'), 3500);
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// ESCROW / NET INCOME
+// ═══════════════════════════════════════════════════════════════════
+let escrowCharts = {};
+
+async function loadEscrowData() {
+  if (!S.cfg) { openSetup(); return; }
+
+  // Ambil order COMPLETED dari bulan yang dipilih
+  const allOrders = getOrdersForDisplay();
+  const completedOrders = allOrders.filter(o =>
+    ['COMPLETED','TO_CONFIRM_RECEIVE'].includes(o.order_status)
+  );
+
+  if (!completedOrders.length) {
+    toast('Tidak ada order completed untuk dihitung', 'err');
+    return;
+  }
+
+  // Tampilkan section keuangan
+  document.getElementById('financeCard').style.display = 'block';
+  document.getElementById('financeCard').scrollIntoView({behavior:'smooth'});
+  document.getElementById('escrowLoading').style.display = 'block';
+  document.getElementById('financeSummary').style.opacity = '0.3';
+
+  const sns = completedOrders.slice(0, 100).map(o => o.order_sn);
+  document.getElementById('escrowLoadingText').textContent = `Mengambil data keuangan ${sns.length} order...`;
+
+  try {
+    // Batch per 20 (escrow 1 request per SN, bisa lambat)
+    const BATCH = 20;
+    let allEscrow = [];
+    let processed = 0;
+
+    for (let i = 0; i < sns.length; i += BATCH) {
+      const batch = sns.slice(i, i + BATCH);
+      const res = await fetch(`${S.cfg.n8n}/webhook/shopee-escrow`, {
+        method: 'POST', mode: 'cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          order_sns: batch,
+          access_token: S.cfg.token || ''
+        })
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      if (data.orders?.length) allEscrow.push(...data.orders);
+      processed += batch.length;
+      document.getElementById('escrowLoadingText').textContent =
+        `Mengambil data keuangan... ${processed}/${sns.length} order`;
+    }
+
+    renderEscrowData(allEscrow, completedOrders);
+
+  } catch(e) {
+    toast('Error escrow: ' + e.message, 'err');
+    console.error(e);
+  }
+
+  document.getElementById('escrowLoading').style.display = 'none';
+  document.getElementById('financeSummary').style.opacity = '1';
+}
+
+function renderEscrowData(escrowList, orders) {
+  if (!escrowList.length) {
+    toast('Tidak ada data escrow', 'err');
+    return;
+  }
+
+  const totalOmset     = orders.reduce((s,o) => s + parseFloat(o.total_amount||0), 0);
+  const totalNet       = escrowList.reduce((s,e) => s + e.escrow_amount, 0);
+  const totalComm      = escrowList.reduce((s,e) => s + e.commission_fee, 0);
+  const totalService   = escrowList.reduce((s,e) => s + e.service_fee, 0);
+  const totalVoucher   = escrowList.reduce((s,e) => s + e.voucher_from_seller, 0);
+  const totalShipping  = escrowList.reduce((s,e) => s + e.final_shipping_fee, 0);
+  const margin         = totalOmset > 0 ? ((totalNet/totalOmset)*100).toFixed(1) : 0;
+
+  // Update KPI Net Income
+  document.getElementById('kNet').textContent    = fmtRp(totalNet);
+  document.getElementById('kNetNote').textContent = `${margin}% margin bersih`;
+
+  // Update summary cards
+  document.getElementById('fNet').textContent        = fmtRp(totalNet);
+  document.getElementById('fCommission').textContent = fmtRp(totalComm);
+  document.getElementById('fService').textContent    = fmtRp(totalService);
+  document.getElementById('fVoucher').textContent    = fmtRp(totalVoucher);
+  document.getElementById('fCommissionPct').textContent =
+    totalOmset > 0 ? `${((totalComm/totalOmset)*100).toFixed(1)}% dari omset` : '—';
+
+  const period = document.getElementById('kOmsetNote').textContent;
+  document.getElementById('financeSub').textContent =
+    `${escrowList.length} order · ${period} · Margin ${margin}%`;
+
+  // Chart: Omset vs Net Income
+  const ctx1 = document.getElementById('chartFinance').getContext('2d');
+  if (escrowCharts.finance) escrowCharts.finance.destroy();
+  escrowCharts.finance = new Chart(ctx1, {
+    type: 'bar',
+    data: {
+      labels: ['Omset Bruto', 'Net Income'],
+      datasets: [{
+        data: [totalOmset, totalNet],
+        backgroundColor: ['#fecaca', '#bbf7d0'],
+        borderColor: ['#ee4d2d', '#059669'],
+        borderWidth: 2,
+        borderRadius: 8
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        y: { ticks: { callback: v => fmtRpShort(v), font: { size: 11 } }, grid: { color: '#f3f4f6' } },
+        x: { ticks: { font: { size: 12, weight: '600' } }, grid: { display: false } }
+      }
+    }
+  });
+
+  // Chart: Distribusi potongan
+  const ctx2 = document.getElementById('chartDeductions').getContext('2d');
+  if (escrowCharts.deductions) escrowCharts.deductions.destroy();
+  escrowCharts.deductions = new Chart(ctx2, {
+    type: 'doughnut',
+    data: {
+      labels: ['Net Income', 'Komisi', 'Biaya Layanan', 'Voucher Seller', 'Ongkir Seller'],
+      datasets: [{
+        data: [totalNet, totalComm, totalService, totalVoucher, totalShipping],
+        backgroundColor: ['#10b981','#f59e0b','#3b82f6','#8b5cf6','#ef4444'],
+        borderWidth: 2, borderColor: '#fff'
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '60%',
+      plugins: { legend: { position: 'bottom', labels: { font: { size: 10 }, padding: 8, boxWidth: 10 } } }
+    }
+  });
+
+  toast(`✅ Net income: ${fmtRp(totalNet)} (${margin}% margin)`, 'ok');
 }
 </script>
 </body>
