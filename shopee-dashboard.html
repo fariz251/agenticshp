@@ -272,6 +272,29 @@ tbody tr:hover td{background:#fafafa}
         <div style="position:relative;height:200px"><canvas id="chartDeductions"></canvas></div>
       </div>
     </div>
+    <!-- Breakdown per Bulan -->
+    <div style="margin-top:20px">
+      <div style="font-size:13px;font-weight:700;margin-bottom:4px">📅 Breakdown Net Income per Bulan</div>
+      <div style="font-size:12px;color:#6b7280;margin-bottom:12px">Klik header kolom untuk sort</div>
+      <div class="tbl-wrap">
+        <table id="monthlyFinanceTable">
+          <thead>
+            <tr>
+              <th style="cursor:pointer" onclick="sortFinanceTable('month')">Bulan ↕</th>
+              <th style="cursor:pointer;text-align:right" onclick="sortFinanceTable('omset')">Omset ↕</th>
+              <th style="cursor:pointer;text-align:right" onclick="sortFinanceTable('net')">Net Income ↕</th>
+              <th style="cursor:pointer;text-align:right" onclick="sortFinanceTable('commission')">Komisi ↕</th>
+              <th style="cursor:pointer;text-align:right" onclick="sortFinanceTable('margin')">Margin ↕</th>
+              <th style="cursor:pointer;text-align:center" onclick="sortFinanceTable('orders')">Order ↕</th>
+            </tr>
+          </thead>
+          <tbody id="monthlyFinanceBody">
+            <tr><td colspan="6" style="text-align:center;padding:24px;color:#9ca3af">Klik "Hitung" untuk muat data</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
     <!-- Loading indicator -->
     <div id="escrowLoading" style="display:none;text-align:center;padding:24px;color:#6b7280">
       <div style="font-size:24px;animation:spin .7s linear infinite;display:inline-block">⏳</div>
@@ -450,6 +473,7 @@ window.addEventListener('load', async () => {
       initCharts();
 
       // Load cache dari n8n + localStorage
+      loadEscrowCacheFromStorage();
       toast('📦 Mengecek cache...', 'inf');
       await loadAllCacheFromStorage();
       updateCacheGrid();
@@ -1130,12 +1154,20 @@ function toast(msg, type='inf') {
 // ═══════════════════════════════════════════════════════════════════
 let escrowCharts = {};
 
+// Cache escrow per order SN - tidak fetch ulang yang sudah ada
+S.escrowCache = S.escrowCache || {};
+
 async function loadEscrowData() {
   if (!S.cfg) { openSetup(); return; }
 
-  // Ambil order COMPLETED dari bulan yang dipilih
-  const allOrders = getOrdersForDisplay();
-  const completedOrders = allOrders.filter(o =>
+  // Ambil SEMUA order COMPLETED dari SEMUA bulan yang ada di cache (bukan cuma yang ditampilkan)
+  const allOrdersAllMonths = [];
+  for (let m = 1; m <= 12; m++) {
+    const data = loadMonthCache(S.year, m);
+    if (data?.orders) allOrdersAllMonths.push(...data.orders);
+  }
+
+  const completedOrders = allOrdersAllMonths.filter(o =>
     ['COMPLETED','TO_CONFIRM_RECEIVE'].includes(o.order_status)
   );
 
@@ -1144,49 +1176,75 @@ async function loadEscrowData() {
     return;
   }
 
-  // Tampilkan section keuangan
   document.getElementById('financeCard').style.display = 'block';
   document.getElementById('financeCard').scrollIntoView({behavior:'smooth'});
   document.getElementById('escrowLoading').style.display = 'block';
   document.getElementById('financeSummary').style.opacity = '0.3';
 
-  const sns = completedOrders.slice(0, 100).map(o => o.order_sn);
-  document.getElementById('escrowLoadingText').textContent = `Mengambil data keuangan ${sns.length} order...`;
+  // Filter yang belum ada di cache
+  const needFetch = completedOrders.filter(o => !S.escrowCache[o.order_sn]);
+  const sns = needFetch.map(o => o.order_sn);
 
-  try {
-    // Batch per 20 (escrow 1 request per SN, bisa lambat)
-    const BATCH = 20;
-    let allEscrow = [];
-    let processed = 0;
+  if (sns.length === 0) {
+    toast('Semua data sudah di cache', 'inf');
+  } else {
+    document.getElementById('escrowLoadingText').textContent = `Mengambil data keuangan 0/${sns.length} order baru...`;
 
-    for (let i = 0; i < sns.length; i += BATCH) {
-      const batch = sns.slice(i, i + BATCH);
-      const res = await fetch(`${S.cfg.n8n}/webhook/shopee-escrow`, {
-        method: 'POST', mode: 'cors',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          order_sns: batch,
-          access_token: S.cfg.token || ''
-        })
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      if (data.orders?.length) allEscrow.push(...data.orders);
-      processed += batch.length;
-      document.getElementById('escrowLoadingText').textContent =
-        `Mengambil data keuangan... ${processed}/${sns.length} order`;
+    try {
+      const BATCH = 15;
+      let processed = 0;
+
+      for (let i = 0; i < sns.length; i += BATCH) {
+        const batch = sns.slice(i, i + BATCH);
+        const res = await fetch(`${S.cfg.n8n}/webhook/shopee-escrow`, {
+          method: 'POST', mode: 'cors',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ order_sns: batch, access_token: S.cfg.token || '' })
+        });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (data.orders?.length) {
+          data.orders.forEach(e => { S.escrowCache[e.order_sn] = e; });
+        }
+        processed += batch.length;
+        const pct = Math.round((processed/sns.length)*100);
+        document.getElementById('escrowLoadingText').textContent =
+          `Mengambil data keuangan... ${processed}/${sns.length} order (${pct}%)`;
+      }
+
+      // Simpan cache escrow ke localStorage (persist)
+      try {
+        localStorage.setItem('shopee_escrow_cache', JSON.stringify(S.escrowCache));
+      } catch(e) { console.warn('Escrow cache too large for localStorage'); }
+
+    } catch(e) {
+      toast('Error escrow: ' + e.message, 'err');
+      console.error(e);
     }
-
-    renderEscrowData(allEscrow, completedOrders);
-
-  } catch(e) {
-    toast('Error escrow: ' + e.message, 'err');
-    console.error(e);
   }
+
+  // Ambil semua escrow dari cache untuk completedOrders
+  const allEscrow = completedOrders
+    .map(o => S.escrowCache[o.order_sn])
+    .filter(Boolean);
+
+  renderEscrowData(allEscrow, completedOrders);
 
   document.getElementById('escrowLoading').style.display = 'none';
   document.getElementById('financeSummary').style.opacity = '1';
+  toast(`✅ Net income dihitung: ${allEscrow.length} order`, 'ok');
 }
+
+// Load escrow cache dari localStorage saat boot
+function loadEscrowCacheFromStorage() {
+  try {
+    const raw = localStorage.getItem('shopee_escrow_cache');
+    if (raw) S.escrowCache = JSON.parse(raw);
+  } catch(e) { S.escrowCache = {}; }
+}
+
+S.lastEscrowList = null;
+S.lastEscrowOrders = null;
 
 function renderEscrowData(escrowList, orders) {
   if (!escrowList.length) {
@@ -1194,19 +1252,40 @@ function renderEscrowData(escrowList, orders) {
     return;
   }
 
-  const totalOmset     = orders.reduce((s,o) => s + parseFloat(o.total_amount||0), 0);
-  const totalNet       = escrowList.reduce((s,e) => s + e.escrow_amount, 0);
-  const totalComm      = escrowList.reduce((s,e) => s + e.commission_fee, 0);
-  const totalService   = escrowList.reduce((s,e) => s + e.service_fee, 0);
-  const totalVoucher   = escrowList.reduce((s,e) => s + e.voucher_from_seller, 0);
-  const totalShipping  = escrowList.reduce((s,e) => s + e.final_shipping_fee, 0);
+  S.lastEscrowList = escrowList;
+  S.lastEscrowOrders = orders;
+
+  // Filter sesuai bulan yang dipilih saat ini untuk KPI utama
+  const orderMap = {};
+  orders.forEach(o => orderMap[o.order_sn] = o);
+
+  let displayEscrow = escrowList;
+  if (S.month !== 'all') {
+    const snsInMonth = new Set(
+      orders.filter(o => {
+        const d = new Date(o.create_time*1000);
+        return d.getFullYear()===S.year && (d.getMonth()+1)===parseInt(S.month);
+      }).map(o=>o.order_sn)
+    );
+    displayEscrow = escrowList.filter(e => snsInMonth.has(e.order_sn));
+  } else {
+    const snsInYear = new Set(
+      orders.filter(o => new Date(o.create_time*1000).getFullYear()===S.year).map(o=>o.order_sn)
+    );
+    displayEscrow = escrowList.filter(e => snsInYear.has(e.order_sn));
+  }
+
+  const totalOmset     = displayEscrow.reduce((s,e) => s + e.buyer_total_amount, 0);
+  const totalNet       = displayEscrow.reduce((s,e) => s + e.escrow_amount, 0);
+  const totalComm      = displayEscrow.reduce((s,e) => s + e.commission_fee, 0);
+  const totalService   = displayEscrow.reduce((s,e) => s + e.service_fee, 0);
+  const totalVoucher   = displayEscrow.reduce((s,e) => s + e.voucher_from_seller, 0);
+  const totalShipping  = displayEscrow.reduce((s,e) => s + e.actual_shipping_fee, 0);
   const margin         = totalOmset > 0 ? ((totalNet/totalOmset)*100).toFixed(1) : 0;
 
-  // Update KPI Net Income
   document.getElementById('kNet').textContent    = fmtRp(totalNet);
   document.getElementById('kNetNote').textContent = `${margin}% margin bersih`;
 
-  // Update summary cards
   document.getElementById('fNet').textContent        = fmtRp(totalNet);
   document.getElementById('fCommission').textContent = fmtRp(totalComm);
   document.getElementById('fService').textContent    = fmtRp(totalService);
@@ -1216,7 +1295,10 @@ function renderEscrowData(escrowList, orders) {
 
   const period = document.getElementById('kOmsetNote').textContent;
   document.getElementById('financeSub').textContent =
-    `${escrowList.length} order · ${period} · Margin ${margin}%`;
+    `${displayEscrow.length} order · ${period} · Margin ${margin}%`;
+
+  // ── Breakdown per bulan (selalu dari SEMUA data, bukan cuma yang ditampilkan) ──
+  renderMonthlyFinanceTable(escrowList, orders);
 
   // Chart: Omset vs Net Income
   const ctx1 = document.getElementById('chartFinance').getContext('2d');
@@ -1263,6 +1345,103 @@ function renderEscrowData(escrowList, orders) {
   });
 
   toast(`✅ Net income: ${fmtRp(totalNet)} (${margin}% margin)`, 'ok');
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// MONTHLY FINANCE TABLE - breakdown & sort
+// ═══════════════════════════════════════════════════════════════════
+S.monthlyFinanceData = [];
+S.financeSortKey = 'month';
+S.financeSortDir = 1;
+
+function renderMonthlyFinanceTable(escrowList, orders) {
+  const orderMap = {};
+  orders.forEach(o => orderMap[o.order_sn] = o);
+
+  const byMonth = {};
+  escrowList.forEach(e => {
+    const order = orderMap[e.order_sn];
+    if (!order) return;
+    const d = new Date(order.create_time * 1000);
+    const mk = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
+    if (!byMonth[mk]) byMonth[mk] = { month: mk, omset:0, net:0, commission:0, service:0, orders:0 };
+    byMonth[mk].omset      += e.buyer_total_amount;
+    byMonth[mk].net         += e.escrow_amount;
+    byMonth[mk].commission += e.commission_fee;
+    byMonth[mk].service     += e.service_fee;
+    byMonth[mk].orders++;
+  });
+
+  S.monthlyFinanceData = Object.values(byMonth).map(m => ({
+    ...m,
+    margin: m.omset > 0 ? (m.net/m.omset*100) : 0
+  }));
+
+  renderFinanceTableRows();
+}
+
+function sortFinanceTable(key) {
+  if (S.financeSortKey === key) {
+    S.financeSortDir *= -1;
+  } else {
+    S.financeSortKey = key;
+    S.financeSortDir = key === 'month' ? 1 : -1; // default desc untuk angka, asc untuk bulan
+  }
+  renderFinanceTableRows();
+}
+
+function renderFinanceTableRows() {
+  const tbody = document.getElementById('monthlyFinanceBody');
+  if (!S.monthlyFinanceData.length) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;padding:24px;color:#9ca3af">Belum ada data</td></tr>';
+    return;
+  }
+
+  const sorted = [...S.monthlyFinanceData].sort((a,b) => {
+    const key = S.financeSortKey;
+    if (key === 'month') return a.month.localeCompare(b.month) * S.financeSortDir;
+    return (a[key] - b[key]) * S.financeSortDir;
+  });
+
+  const maxNet = Math.max(...sorted.map(m=>m.net), 1);
+
+  tbody.innerHTML = sorted.map(m => {
+    const [y, mo] = m.month.split('-');
+    const monthName = MONTHS[parseInt(mo)-1];
+    const isCurrentFilter = (S.month === 'all' && parseInt(y) === S.year) ||
+                             (S.month !== 'all' && parseInt(mo) === parseInt(S.month) && parseInt(y) === S.year);
+    return `<tr style="${isCurrentFilter ? 'background:#f0fdf4' : ''}">
+      <td style="font-weight:700">${monthName} ${y}</td>
+      <td style="text-align:right">${fmtRp(m.omset)}</td>
+      <td style="text-align:right;font-weight:700;color:#059669">${fmtRp(m.net)}</td>
+      <td style="text-align:right;color:#d97706">${fmtRp(m.commission)}</td>
+      <td style="text-align:right">
+        <span style="display:inline-flex;align-items:center;gap:6px">
+          <span style="width:40px;height:4px;background:#f3f4f6;border-radius:2px;position:relative;display:inline-block">
+            <span style="position:absolute;left:0;top:0;height:100%;width:${(m.net/maxNet*100).toFixed(0)}%;background:#059669;border-radius:2px"></span>
+          </span>
+          ${m.margin.toFixed(1)}%
+        </span>
+      </td>
+      <td style="text-align:center;font-weight:600">${m.orders}</td>
+    </tr>`;
+  }).join('');
+
+  // Tambah baris total
+  const totalOmset = sorted.reduce((s,m)=>s+m.omset,0);
+  const totalNet    = sorted.reduce((s,m)=>s+m.net,0);
+  const totalComm   = sorted.reduce((s,m)=>s+m.commission,0);
+  const totalOrders = sorted.reduce((s,m)=>s+m.orders,0);
+  const totalMargin = totalOmset>0 ? (totalNet/totalOmset*100).toFixed(1) : 0;
+
+  tbody.innerHTML += `<tr style="border-top:2px solid #e5e7eb;font-weight:800;background:#fafafa">
+    <td>TOTAL</td>
+    <td style="text-align:right">${fmtRp(totalOmset)}</td>
+    <td style="text-align:right;color:#059669">${fmtRp(totalNet)}</td>
+    <td style="text-align:right;color:#d97706">${fmtRp(totalComm)}</td>
+    <td style="text-align:right">${totalMargin}%</td>
+    <td style="text-align:center">${totalOrders}</td>
+  </tr>`;
 }
 </script>
 </body>
