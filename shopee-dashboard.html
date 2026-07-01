@@ -168,6 +168,7 @@ tbody tr:hover td{background:#fafafa}
     <span id="lastUpdateBadge">🕐 <span id="lastUpdateTime">-</span></span>
     <button class="btn btn-primary btn-sm" id="refreshBtn" onclick="refreshData()" style="font-size:12px;padding:6px 12px">🔄 Refresh</button>
     <button class="btn btn-ghost" id="cachePanelBtn" onclick="toggleCachePanel()" style="font-size:12px;padding:6px 10px" title="Status Cache per Bulan">📦 Cache</button>
+    <button class="btn btn-ghost" onclick="toggleHppPanel()" style="font-size:12px;padding:6px 10px" title="Kelola HPP">🏷️ HPP</button>
     <button class="btn btn-ghost" onclick="clearAllCache()" style="font-size:12px;padding:6px 10px" title="Hapus semua cache">🗑️</button>
     <button class="btn btn-ghost" onclick="openSetup()" style="padding:6px 10px">⚙️</button>
   </div>
@@ -187,6 +188,33 @@ tbody tr:hover td{background:#fafafa}
   </div>
   <div class="cache-grid" id="cacheGrid"></div>
   <div style="font-size:11px;color:var(--sub);margin-top:8px">🟢 = tersimpan di cache · klik bulan untuk load/fetch</div>
+</div>
+
+<!-- HPP Panel -->
+<div id="hppPanel" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;margin:12px 24px 0;display:none;box-shadow:var(--shadow-s)">
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+    <div>
+      <div style="font-size:13px;font-weight:700">🏷️ HPP (Harga Pokok Penjualan) per SKU</div>
+      <div style="font-size:11px;color:var(--sub);margin-top:2px" id="hppStatus">Belum ada data HPP</div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center">
+      <input type="file" id="hppFileInput" accept=".csv" style="display:none" onchange="handleHppUpload(event)">
+      <button class="btn btn-ghost" style="font-size:12px" onclick="downloadHppTemplate()">📥 Download Template</button>
+      <button class="btn btn-primary" style="font-size:12px" onclick="document.getElementById('hppFileInput').click()">📤 Upload CSV HPP</button>
+      <button class="btn btn-ghost" style="font-size:12px" onclick="clearHpp()">🗑️</button>
+    </div>
+  </div>
+  <div id="hppPreview" style="margin-top:10px;display:none">
+    <div style="font-size:11px;color:var(--sub);margin-bottom:6px" id="hppSummary"></div>
+    <div style="max-height:150px;overflow-y:auto;border:1px solid var(--border);border-radius:8px">
+      <table style="width:100%;font-size:11px">
+        <thead style="position:sticky;top:0;background:var(--bg)">
+          <tr><th style="padding:6px 10px;text-align:left">SKU</th><th style="padding:6px 10px;text-align:right">HPP (Rp)</th></tr>
+        </thead>
+        <tbody id="hppTableBody"></tbody>
+      </table>
+    </div>
+  </div>
 </div>
 
 <!-- Filter Bar -->
@@ -213,9 +241,10 @@ tbody tr:hover td{background:#fafafa}
 <!-- Main -->
 <div id="main">
   <!-- KPI -->
-  <div class="kpi-grid" style="grid-template-columns:repeat(5,1fr)">
+  <div class="kpi-grid" style="grid-template-columns:repeat(6,1fr)">
     <div class="kpi c-shopee"><span class="kpi-emoji">💰</span><div class="kpi-lbl">Total Omset</div><div class="kpi-val" id="kOmset">—</div><div class="kpi-note" id="kOmsetNote">—</div></div>
-    <div class="kpi" style="--accent:#059669"><span class="kpi-emoji">💵</span><div class="kpi-lbl">Net Income</div><div class="kpi-val" id="kNet" style="color:#059669">—</div><div class="kpi-note" id="kNetNote"><button onclick="loadEscrowData()" id="btnEscrow" class="btn btn-ghost" style="font-size:11px;padding:3px 8px;margin-top:2px">Hitung ▶</button></div></div>
+    <div class="kpi" style="--accent:#059669"><span class="kpi-emoji">💵</span><div class="kpi-lbl">Net Income (Cair)</div><div class="kpi-val" id="kNet" style="color:#059669">—</div><div class="kpi-note" id="kNetNote"><button onclick="loadEscrowData()" id="btnEscrow" class="btn btn-ghost" style="font-size:11px;padding:3px 8px;margin-top:2px">Hitung ▶</button></div></div>
+    <div class="kpi" style="--accent:#0891b2"><span class="kpi-emoji">📈</span><div class="kpi-lbl">Net Profit Real</div><div class="kpi-val" id="kProfit" style="color:#0891b2">—</div><div class="kpi-note" id="kProfitNote">Cair − HPP</div></div>
     <div class="kpi c-blue"><span class="kpi-emoji">🧾</span><div class="kpi-lbl">Total Pesanan</div><div class="kpi-val" id="kOrders">—</div><div class="kpi-note" id="kOrdersNote">—</div></div>
     <div class="kpi c-green"><span class="kpi-emoji">📦</span><div class="kpi-lbl">Produk Unik</div><div class="kpi-val" id="kProducts">—</div><div class="kpi-note" id="kProductsNote">Jenis produk terjual</div></div>
     <div class="kpi c-purple"><span class="kpi-emoji">🔢</span><div class="kpi-lbl">Total Quantity</div><div class="kpi-val" id="kQty">—</div><div class="kpi-note" id="kQtyNote">Total item</div></div>
@@ -258,6 +287,11 @@ tbody tr:hover td{background:#fafafa}
         <div style="font-size:20px;font-weight:800;color:#9333ea;margin:4px 0" id="fVoucher">—</div>
         <div style="font-size:11px;color:#6b7280">Ditanggung seller</div>
       </div>
+      <div style="background:#ecfeff;border-radius:10px;padding:14px;text-align:center;border:1.5px solid #06b6d4">
+        <div style="font-size:11px;color:#0891b2;font-weight:700;text-transform:uppercase">Net Profit Real</div>
+        <div style="font-size:20px;font-weight:800;color:#0891b2;margin:4px 0" id="fProfit">—</div>
+        <div style="font-size:11px;color:#6b7280" id="fProfitNote">Net Income − HPP</div>
+      </div>
     </div>
     <!-- Net Income Chart -->
     <div style="display:grid;grid-template-columns:2fr 1fr;gap:14px">
@@ -283,7 +317,8 @@ tbody tr:hover td{background:#fafafa}
               <th style="cursor:pointer" onclick="sortFinanceTable('month')">Bulan ↕</th>
               <th style="cursor:pointer;text-align:right" onclick="sortFinanceTable('omset')">Omset ↕</th>
               <th style="cursor:pointer;text-align:right" onclick="sortFinanceTable('net')">Net Income ↕</th>
-              <th style="cursor:pointer;text-align:right" onclick="sortFinanceTable('commission')">Komisi ↕</th>
+              <th style="cursor:pointer;text-align:right" onclick="sortFinanceTable('hpp')">HPP ↕</th>
+              <th style="cursor:pointer;text-align:right;background:#ecfeff" onclick="sortFinanceTable('profit')">Net Profit ↕</th>
               <th style="cursor:pointer;text-align:right" onclick="sortFinanceTable('margin')">Margin ↕</th>
               <th style="cursor:pointer;text-align:center" onclick="sortFinanceTable('orders')">Order ↕</th>
             </tr>
@@ -472,7 +507,8 @@ window.addEventListener('load', async () => {
       setStatus('ok');
       initCharts();
 
-      // Load cache dari n8n + localStorage
+      // Load HPP dan escrow cache
+      loadHppFromStorage();
       loadEscrowCacheFromStorage();
       toast('📦 Mengecek cache...', 'inf');
       await loadAllCacheFromStorage();
@@ -1293,9 +1329,29 @@ function renderEscrowData(escrowList, orders) {
   document.getElementById('fCommissionPct').textContent =
     totalOmset > 0 ? `${((totalComm/totalOmset)*100).toFixed(1)}% dari omset` : '—';
 
+  // ── Hitung HPP & Net Profit Real ──
+  const hasHpp = Object.keys(S.hppMap).length > 0;
+  let totalHpp = 0;
+  displayEscrow.forEach(e => {
+    const order = orderMap[e.order_sn];
+    if (order) totalHpp += calcOrderHpp(order);
+  });
+  const totalProfit = totalNet - totalHpp;
+  const profitMargin = totalOmset > 0 ? ((totalProfit/totalOmset)*100).toFixed(1) : 0;
+
+  document.getElementById('kProfit').textContent = hasHpp ? fmtRp(totalProfit) : '—';
+  document.getElementById('kProfitNote').textContent = hasHpp
+    ? `${profitMargin}% margin bersih`
+    : 'Upload HPP dulu →';
+
+  document.getElementById('fProfit').textContent = hasHpp ? fmtRp(totalProfit) : '—';
+  document.getElementById('fProfitNote').textContent = hasHpp
+    ? `HPP: ${fmtRp(totalHpp)}`
+    : 'Klik 🏷️ HPP untuk upload';
+
   const period = document.getElementById('kOmsetNote').textContent;
   document.getElementById('financeSub').textContent =
-    `${displayEscrow.length} order · ${period} · Margin ${margin}%`;
+    `${displayEscrow.length} order · ${period} · Margin ${margin}%${hasHpp?` · Profit ${profitMargin}%`:''}`;
 
   // ── Breakdown per bulan (selalu dari SEMUA data, bukan cuma yang ditampilkan) ──
   renderMonthlyFinanceTable(escrowList, orders);
@@ -1364,9 +1420,10 @@ function renderMonthlyFinanceTable(escrowList, orders) {
     if (!order) return;
     const d = new Date(order.create_time * 1000);
     const mk = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-    if (!byMonth[mk]) byMonth[mk] = { month: mk, omset:0, net:0, commission:0, service:0, orders:0 };
+    if (!byMonth[mk]) byMonth[mk] = { month: mk, omset:0, net:0, hpp:0, commission:0, service:0, orders:0 };
     byMonth[mk].omset      += e.buyer_total_amount;
     byMonth[mk].net         += e.escrow_amount;
+    byMonth[mk].hpp         += calcOrderHpp(order);
     byMonth[mk].commission += e.commission_fee;
     byMonth[mk].service     += e.service_fee;
     byMonth[mk].orders++;
@@ -1374,7 +1431,8 @@ function renderMonthlyFinanceTable(escrowList, orders) {
 
   S.monthlyFinanceData = Object.values(byMonth).map(m => ({
     ...m,
-    margin: m.omset > 0 ? (m.net/m.omset*100) : 0
+    profit: m.net - m.hpp,
+    margin: m.omset > 0 ? ((m.net-m.hpp)/m.omset*100) : 0
   }));
 
   renderFinanceTableRows();
@@ -1405,6 +1463,8 @@ function renderFinanceTableRows() {
 
   const maxNet = Math.max(...sorted.map(m=>m.net), 1);
 
+  const hasHpp = Object.keys(S.hppMap).length > 0;
+
   tbody.innerHTML = sorted.map(m => {
     const [y, mo] = m.month.split('-');
     const monthName = MONTHS[parseInt(mo)-1];
@@ -1414,11 +1474,12 @@ function renderFinanceTableRows() {
       <td style="font-weight:700">${monthName} ${y}</td>
       <td style="text-align:right">${fmtRp(m.omset)}</td>
       <td style="text-align:right;font-weight:700;color:#059669">${fmtRp(m.net)}</td>
-      <td style="text-align:right;color:#d97706">${fmtRp(m.commission)}</td>
+      <td style="text-align:right;color:#dc2626">${hasHpp ? fmtRp(m.hpp) : '—'}</td>
+      <td style="text-align:right;font-weight:800;color:#0891b2;background:#ecfeff66">${hasHpp ? fmtRp(m.profit) : '—'}</td>
       <td style="text-align:right">
         <span style="display:inline-flex;align-items:center;gap:6px">
           <span style="width:40px;height:4px;background:#f3f4f6;border-radius:2px;position:relative;display:inline-block">
-            <span style="position:absolute;left:0;top:0;height:100%;width:${(m.net/maxNet*100).toFixed(0)}%;background:#059669;border-radius:2px"></span>
+            <span style="position:absolute;left:0;top:0;height:100%;width:${Math.max(0,(m.net/maxNet*100)).toFixed(0)}%;background:#059669;border-radius:2px"></span>
           </span>
           ${m.margin.toFixed(1)}%
         </span>
@@ -1430,18 +1491,160 @@ function renderFinanceTableRows() {
   // Tambah baris total
   const totalOmset = sorted.reduce((s,m)=>s+m.omset,0);
   const totalNet    = sorted.reduce((s,m)=>s+m.net,0);
-  const totalComm   = sorted.reduce((s,m)=>s+m.commission,0);
+  const totalHpp     = sorted.reduce((s,m)=>s+m.hpp,0);
+  const totalProfit = sorted.reduce((s,m)=>s+m.profit,0);
   const totalOrders = sorted.reduce((s,m)=>s+m.orders,0);
-  const totalMargin = totalOmset>0 ? (totalNet/totalOmset*100).toFixed(1) : 0;
+  const totalMargin = totalOmset>0 ? (totalProfit/totalOmset*100).toFixed(1) : 0;
 
   tbody.innerHTML += `<tr style="border-top:2px solid #e5e7eb;font-weight:800;background:#fafafa">
     <td>TOTAL</td>
     <td style="text-align:right">${fmtRp(totalOmset)}</td>
     <td style="text-align:right;color:#059669">${fmtRp(totalNet)}</td>
-    <td style="text-align:right;color:#d97706">${fmtRp(totalComm)}</td>
+    <td style="text-align:right;color:#dc2626">${hasHpp ? fmtRp(totalHpp) : '—'}</td>
+    <td style="text-align:right;color:#0891b2;background:#ecfeff">${hasHpp ? fmtRp(totalProfit) : '—'}</td>
     <td style="text-align:right">${totalMargin}%</td>
     <td style="text-align:center">${totalOrders}</td>
   </tr>`;
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// HPP (COST OF GOODS) - upload CSV, mapping per SKU
+// ═══════════════════════════════════════════════════════════════════
+S.hppMap = {}; // { sku: hpp_value }
+
+function loadHppFromStorage() {
+  try {
+    const raw = localStorage.getItem('shopee_hpp_map');
+    if (raw) S.hppMap = JSON.parse(raw);
+  } catch(e) { S.hppMap = {}; }
+  updateHppStatus();
+}
+
+function saveHppToStorage() {
+  try {
+    localStorage.setItem('shopee_hpp_map', JSON.stringify(S.hppMap));
+  } catch(e) { console.warn('HPP save failed:', e.message); }
+}
+
+function toggleHppPanel() {
+  const p = document.getElementById('hppPanel');
+  p.style.display = p.style.display === 'none' ? 'block' : 'none';
+  if (p.style.display === 'block') renderHppPreview();
+}
+
+function downloadHppTemplate() {
+  // Ambil semua SKU unik dari data yang ada
+  const skus = new Set();
+  for (let m = 1; m <= 12; m++) {
+    const data = loadMonthCache(S.year, m);
+    if (data?.orders) {
+      data.orders.forEach(o => (o.items||[]).forEach(it => { if (it.sku && it.sku !== '-') skus.add(it.sku); }));
+    }
+  }
+
+  const rows = [['SKU','HPP']];
+  if (skus.size > 0) {
+    [...skus].sort().forEach(sku => rows.push([sku, S.hppMap[sku] || '']));
+  } else {
+    rows.push(['CONTOH-SKU-1', '5000']);
+    rows.push(['CONTOH-SKU-2', '8000']);
+  }
+
+  const csv = rows.map(r => r.map(v=>`"${v}"`).join(',')).join('\n');
+  const a = Object.assign(document.createElement('a'), {
+    href: URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'})),
+    download: 'template_hpp.csv'
+  });
+  a.click();
+  toast(skus.size>0 ? `Template dengan ${skus.size} SKU didownload` : 'Template kosong didownload', 'ok');
+}
+
+function handleHppUpload(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const text = e.target.result;
+      const lines = text.split(/\r?\n/).filter(l => l.trim());
+      let imported = 0, skipped = 0;
+
+      // Skip header jika ada (deteksi: baris pertama bukan angka di kolom 2)
+      let startIdx = 0;
+      const firstLine = lines[0].split(',').map(c => c.replace(/"/g,'').trim());
+      if (isNaN(parseFloat(firstLine[1]))) startIdx = 1;
+
+      for (let i = startIdx; i < lines.length; i++) {
+        const cols = lines[i].split(',').map(c => c.replace(/"/g,'').trim());
+        if (cols.length < 2) { skipped++; continue; }
+        const sku = cols[0];
+        const hpp = parseFloat(cols[1]);
+        if (!sku || isNaN(hpp)) { skipped++; continue; }
+        S.hppMap[sku] = hpp;
+        imported++;
+      }
+
+      saveHppToStorage();
+      updateHppStatus();
+      renderHppPreview();
+      toast(`✅ ${imported} SKU HPP diimport${skipped>0?`, ${skipped} dilewati`:''}`, 'ok');
+
+      // Auto recalculate jika sudah ada escrow data
+      if (S.lastEscrowList) {
+        renderEscrowData(S.lastEscrowList, S.lastEscrowOrders);
+      }
+
+    } catch(err) {
+      toast('Error parsing CSV: ' + err.message, 'err');
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = ''; // reset input
+}
+
+function updateHppStatus() {
+  const count = Object.keys(S.hppMap).length;
+  const status = document.getElementById('hppStatus');
+  status.textContent = count > 0 ? `${count} SKU memiliki data HPP` : 'Belum ada data HPP';
+}
+
+function renderHppPreview() {
+  const entries = Object.entries(S.hppMap);
+  const preview = document.getElementById('hppPreview');
+  const summary = document.getElementById('hppSummary');
+  const tbody = document.getElementById('hppTableBody');
+
+  if (!entries.length) { preview.style.display = 'none'; return; }
+
+  preview.style.display = 'block';
+  summary.textContent = `${entries.length} SKU terdaftar`;
+  tbody.innerHTML = entries.sort((a,b)=>a[0].localeCompare(b[0])).map(([sku,hpp]) =>
+    `<tr><td style="padding:5px 10px;border-top:1px solid #f3f4f6">${sku}</td><td style="padding:5px 10px;border-top:1px solid #f3f4f6;text-align:right">${fmtRp(hpp)}</td></tr>`
+  ).join('');
+}
+
+function clearHpp() {
+  if (!confirm('Hapus semua data HPP?')) return;
+  S.hppMap = {};
+  saveHppToStorage();
+  updateHppStatus();
+  renderHppPreview();
+  toast('HPP dihapus', 'inf');
+  if (S.lastEscrowList) renderEscrowData(S.lastEscrowList, S.lastEscrowOrders);
+}
+
+// Hitung total HPP untuk 1 order berdasarkan items-nya
+function calcOrderHpp(order) {
+  let total = 0;
+  (order.items || []).forEach(it => {
+    const sku = it.sku;
+    const qty = it.qty || 1;
+    if (sku && S.hppMap[sku] !== undefined) {
+      total += S.hppMap[sku] * qty;
+    }
+  });
+  return total;
 }
 </script>
 </body>
