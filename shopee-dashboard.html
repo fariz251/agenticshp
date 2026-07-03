@@ -1533,30 +1533,49 @@ function toggleHppPanel() {
 }
 
 function downloadHppTemplate() {
-  // Ambil semua SKU unik dari data yang ada
-  const skus = new Set();
+  // Ambil semua SKU dan Model SKU unik dari data yang ada
+  const variantMap = {}; // model_sku → { sku, model_name, name }
+
   for (let m = 1; m <= 12; m++) {
     const data = loadMonthCache(S.year, m);
-    if (data?.orders) {
-      data.orders.forEach(o => (o.items||[]).forEach(it => { if (it.sku && it.sku !== '-') skus.add(it.sku); }));
-    }
+    if (!data?.orders) continue;
+    data.orders.forEach(o => {
+      (o.items||[]).forEach(it => {
+        const modelSku = it.model_sku || it.sku || '';
+        if (!modelSku || modelSku === '-') return;
+        if (!variantMap[modelSku]) {
+          variantMap[modelSku] = {
+            sku:        it.sku || '',
+            model_name: it.model_name || '',
+            name:       it.name || ''
+          };
+        }
+      });
+    });
   }
 
-  const rows = [['SKU','HPP']];
-  if (skus.size > 0) {
-    [...skus].sort().forEach(sku => rows.push([sku, S.hppMap[sku] || '']));
+  const entries = Object.entries(variantMap);
+  const rows = [['Model SKU (Varian)','SKU Produk','Nama Varian','Nama Produk','HPP']];
+
+  if (entries.length > 0) {
+    entries.sort((a,b)=>a[0].localeCompare(b[0])).forEach(([modelSku, info]) => {
+      const hpp = S.hppMap[modelSku] !== undefined ? S.hppMap[modelSku]
+                : S.hppMap[info.sku] !== undefined ? S.hppMap[info.sku] : '';
+      rows.push([modelSku, info.sku, info.model_name, info.name, hpp]);
+    });
   } else {
-    rows.push(['CONTOH-SKU-1', '5000']);
-    rows.push(['CONTOH-SKU-2', '8000']);
+    rows.push(['Cylinder PET 1200 ml Natural','Cylinder PET','1200 ml Natural','Toples Tabung PET','4500']);
+    rows.push(['Cylinder PET 400 ml Natural','Cylinder PET','400 ml Natural','Toples Tabung PET','3500']);
+    rows.push(['Botol Saos 1 250ml','Botol Saos 1','250ml','Botol Saos','5000']);
   }
 
   const csv = rows.map(r => r.map(v=>`"${v}"`).join(',')).join('\n');
   const a = Object.assign(document.createElement('a'), {
     href: URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'})),
-    download: 'template_hpp.csv'
+    download: 'template_hpp_varian.csv'
   });
   a.click();
-  toast(skus.size>0 ? `Template dengan ${skus.size} SKU didownload` : 'Template kosong didownload', 'ok');
+  toast(entries.length>0 ? `Template ${entries.length} varian didownload` : 'Template contoh didownload', 'ok');
 }
 
 function handleHppUpload(event) {
@@ -1578,9 +1597,22 @@ function handleHppUpload(event) {
       for (let i = startIdx; i < lines.length; i++) {
         const cols = lines[i].split(',').map(c => c.replace(/"/g,'').trim());
         if (cols.length < 2) { skipped++; continue; }
-        const sku = cols[0];
-        const hpp = parseFloat(cols[1]);
-        if (!sku || isNaN(hpp)) { skipped++; continue; }
+
+        // Support 2 format:
+        // Format lama: SKU, HPP
+        // Format baru (template varian): Model SKU, SKU Produk, Nama Varian, Nama Produk, HPP
+        let sku, hpp;
+        if (cols.length >= 5 && !isNaN(parseFloat(cols[4]))) {
+          // Format baru - kolom 1=Model SKU, kolom 5=HPP
+          sku = cols[0];
+          hpp = parseFloat(cols[4]);
+        } else {
+          // Format lama - kolom 1=SKU, kolom 2=HPP
+          sku = cols[0];
+          hpp = parseFloat(cols[1]);
+        }
+
+        if (!sku || isNaN(hpp) || hpp < 0) { skipped++; continue; }
         S.hppMap[sku] = hpp;
         imported++;
       }
@@ -1606,7 +1638,14 @@ function handleHppUpload(event) {
 function updateHppStatus() {
   const count = Object.keys(S.hppMap).length;
   const status = document.getElementById('hppStatus');
-  status.textContent = count > 0 ? `${count} SKU memiliki data HPP` : 'Belum ada data HPP';
+  if (count > 0) {
+    // Cek apakah ada model_sku (panjang SKU biasanya lebih panjang untuk varian)
+    const avgLen = Object.keys(S.hppMap).reduce((s,k)=>s+k.length,0)/count;
+    const type = avgLen > 20 ? 'varian' : 'SKU produk';
+    status.textContent = `${count} ${type} memiliki data HPP`;
+  } else {
+    status.textContent = 'Belum ada data HPP — download template untuk mulai';
+  }
 }
 
 function renderHppPreview() {
@@ -1620,7 +1659,10 @@ function renderHppPreview() {
   preview.style.display = 'block';
   summary.textContent = `${entries.length} SKU terdaftar`;
   tbody.innerHTML = entries.sort((a,b)=>a[0].localeCompare(b[0])).map(([sku,hpp]) =>
-    `<tr><td style="padding:5px 10px;border-top:1px solid #f3f4f6">${sku}</td><td style="padding:5px 10px;border-top:1px solid #f3f4f6;text-align:right">${fmtRp(hpp)}</td></tr>`
+    `<tr>
+      <td style="padding:5px 10px;border-top:1px solid #f3f4f6;font-family:monospace;font-size:11px">${sku}</td>
+      <td style="padding:5px 10px;border-top:1px solid #f3f4f6;text-align:right;font-weight:700">${fmtRp(hpp)}</td>
+    </tr>`
   ).join('');
 }
 
@@ -1638,9 +1680,14 @@ function clearHpp() {
 function calcOrderHpp(order) {
   let total = 0;
   (order.items || []).forEach(it => {
-    const sku = it.sku;
-    const qty = it.qty || 1;
-    if (sku && S.hppMap[sku] !== undefined) {
+    const modelSku = it.model_sku;  // varian spesifik, misal "Cylinder PET 1200 ml Natural"
+    const sku      = it.sku;        // SKU produk umum, misal "Cylinder PET"
+    const qty      = it.qty || 1;
+
+    // Prioritas: model_sku → sku → tidak dihitung
+    if (modelSku && S.hppMap[modelSku] !== undefined) {
+      total += S.hppMap[modelSku] * qty;
+    } else if (sku && S.hppMap[sku] !== undefined) {
       total += S.hppMap[sku] * qty;
     }
   });
