@@ -516,10 +516,18 @@ window.addEventListener('load', async () => {
       updateMonthBtnCache();
       updateLastUpdate();
 
+      // Rebuild escrow setelah monthCache ter-load
+      rebuildLastEscrowFromCache();
+
       // Render dari cache yang sudah ada di memory
       const allOrders = getOrdersForDisplay();
       if (allOrders.length > 0) {
         renderAll(allOrders);
+        // Render escrow jika sudah ada
+        if (S.lastEscrowList?.length > 0) {
+          document.getElementById('financeCard').style.display = 'block';
+          renderEscrowData(S.lastEscrowList, S.lastEscrowOrders);
+        }
         toast(`📦 ${allOrders.length} order dari cache`, 'inf');
       } else {
         // Coba load bulan ini dari n8n
@@ -662,6 +670,10 @@ function setMonth(m, btn) {
 
   // Setelah render order, update juga escrow jika sudah ada
   function afterRender() {
+    // Jika lastEscrowList kosong tapi ada escrowCache, rebuild dulu
+    if (!S.lastEscrowList?.length && Object.keys(S.escrowCache||{}).length > 0) {
+      rebuildLastEscrowFromCache();
+    }
     if (S.lastEscrowList?.length > 0) {
       // Rebuild allOrders dari semua bulan untuk referensi yang benar
       const allOrders = [];
@@ -669,7 +681,10 @@ function setMonth(m, btn) {
         const d = loadMonthCache(S.year, mm);
         if (d?.orders) allOrders.push(...d.orders);
       }
-      renderEscrowData(S.lastEscrowList, allOrders.length > 0 ? allOrders : S.lastEscrowOrders);
+      const ref = allOrders.length > 0 ? allOrders : S.lastEscrowOrders;
+      S.lastEscrowOrders = ref; // update referensi
+      renderEscrowData(S.lastEscrowList, ref);
+      document.getElementById('financeCard').style.display = 'block';
     }
   }
 
@@ -1292,8 +1307,32 @@ async function loadEscrowData() {
 function loadEscrowCacheFromStorage() {
   try {
     const raw = localStorage.getItem('shopee_escrow_cache');
-    if (raw) S.escrowCache = JSON.parse(raw);
+    if (raw) {
+      S.escrowCache = JSON.parse(raw);
+      // Rebuild lastEscrowList dari cache agar filter bulan langsung bekerja
+      rebuildLastEscrowFromCache();
+    }
   } catch(e) { S.escrowCache = {}; }
+}
+
+function rebuildLastEscrowFromCache() {
+  if (!S.escrowCache || !Object.keys(S.escrowCache).length) return;
+
+  // Kumpulkan semua orders dari semua bulan
+  const allOrders = [];
+  for (let m = 1; m <= 12; m++) {
+    const mk = `${S.year}-${String(m).padStart(2,'0')}`;
+    const data = S.monthCache[mk];
+    if (data?.orders) allOrders.push(...data.orders);
+  }
+
+  if (!allOrders.length) return; // monthCache belum di-load
+
+  // Build lastEscrowList dari escrowCache yang ada
+  const escrowList = Object.values(S.escrowCache);
+  S.lastEscrowList   = escrowList;
+  S.lastEscrowOrders = allOrders;
+  console.log(`Rebuilt lastEscrowList: ${escrowList.length} escrow, ${allOrders.length} orders`);
 }
 
 S.lastEscrowList = null;
