@@ -660,9 +660,16 @@ function setMonth(m, btn) {
   if (btn) btn.classList.add('on');
   updateCacheGrid();
 
+  // Setelah render order, update juga escrow jika sudah ada
+  function afterRender() {
+    if (S.lastEscrowList?.length > 0) {
+      renderEscrowData(S.lastEscrowList, S.lastEscrowOrders);
+    }
+  }
+
   if (m === 'all') {
     // Semua bulan: render dari cache yang ada, fetch yang belum ada
-    loadSelectedMonths();
+    loadSelectedMonths().then ? loadSelectedMonths().then(afterRender) : (loadSelectedMonths(), afterRender());
   } else {
     // Bulan spesifik
     const memData = loadMonthCache(S.year, m);
@@ -670,6 +677,7 @@ function setMonth(m, btn) {
     if (memData?.orders?.length > 0 && isCacheValid(S.year, m)) {
       // Ada di memory dan valid - instan
       renderAll(memData.orders);
+      afterRender();
       toast(`📦 ${MONTHS[m-1]} dari cache (${memData.orders.length} order)`, 'inf');
     } else if (memData?.needLoad) {
       // Ada di n8n tapi belum di memory
@@ -677,6 +685,7 @@ function setMonth(m, btn) {
       loadMonthFromN8n(S.year, m).then(data => {
         if (data?.orders?.length > 0) {
           renderAll(data.orders);
+          afterRender();
           toast(`📦 ${MONTHS[m-1]}: ${data.orders.length} order`, 'inf');
           updateCacheGrid();
         } else {
@@ -1311,7 +1320,11 @@ function renderEscrowData(escrowList, orders) {
     displayEscrow = escrowList.filter(e => snsInYear.has(e.order_sn));
   }
 
-  const totalOmset     = displayEscrow.reduce((s,e) => s + e.buyer_total_amount, 0);
+  // Omset dari order data (sama dengan KPI utama), bukan buyer_total_amount escrow
+  const totalOmset     = displayEscrow.reduce((s,e) => {
+    const order = orderMap[e.order_sn];
+    return s + parseFloat(order?.total_amount || e.buyer_total_amount || 0);
+  }, 0);
   const totalNet       = displayEscrow.reduce((s,e) => s + e.escrow_amount, 0);
   const totalComm      = displayEscrow.reduce((s,e) => s + e.commission_fee, 0);
   const totalService   = displayEscrow.reduce((s,e) => s + e.service_fee, 0);
