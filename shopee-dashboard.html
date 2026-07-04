@@ -1671,6 +1671,60 @@ function downloadHppTemplate() {
   toast(entries.length>0 ? `Template ${entries.length} varian didownload` : 'Template contoh didownload', 'ok');
 }
 
+// Parse 1 baris CSV dengan benar (handle koma dalam quotes)
+function parseCSVLine(line) {
+  const cols = [];
+  let cur = '', inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') { inQ = !inQ; continue; }
+    if (c === ',' && !inQ) { cols.push(cur); cur = ''; continue; }
+    cur += c;
+  }
+  cols.push(cur);
+  return cols;
+}
+
+// Parse angka format Indonesia/Excel
+// Handle: "1.500" → 1500, "1,500" → 1500, "1500" → 1500
+// Handle: "1.500,50" → 1500.5, "1,500.50" → 1500.5
+function parseIDNumber(str) {
+  if (!str) return NaN;
+  str = str.trim().replace(/[Rp\s]/g, ''); // hapus "Rp" dan spasi
+
+  // Deteksi format: jika ada titik DAN koma, tentukan mana decimal
+  if (str.includes('.') && str.includes(',')) {
+    const dotPos   = str.lastIndexOf('.');
+    const commaPos = str.lastIndexOf(',');
+    if (commaPos > dotPos) {
+      // Format: 1.500,50 → koma = decimal
+      str = str.replace(/\./g, '').replace(',', '.');
+    } else {
+      // Format: 1,500.50 → titik = decimal
+      str = str.replace(/,/g, '');
+    }
+  } else if (str.includes('.')) {
+    // Bisa 1.500 (ribuan) atau 1.5 (decimal)
+    const parts = str.split('.');
+    if (parts[parts.length-1].length === 3) {
+      // Titik = pemisah ribuan: 1.500 → 1500
+      str = str.replace(/\./g, '');
+    }
+    // else titik = decimal: 1.5 → 1.5 (biarkan)
+  } else if (str.includes(',')) {
+    // Bisa 1,500 (ribuan) atau 1,5 (decimal)
+    const parts = str.split(',');
+    if (parts[parts.length-1].length === 3) {
+      // Koma = pemisah ribuan: 1,500 → 1500
+      str = str.replace(/,/g, '');
+    } else {
+      // Koma = decimal: 1,5 → 1.5
+      str = str.replace(',', '.');
+    }
+  }
+  return parseFloat(str);
+}
+
 function handleHppUpload(event) {
   const file = event.target.files[0];
   if (!file) return;
@@ -1688,23 +1742,24 @@ function handleHppUpload(event) {
       if (isNaN(parseFloat(firstLine[1]))) startIdx = 1;
 
       for (let i = startIdx; i < lines.length; i++) {
-        const cols = lines[i].split(',').map(c => c.replace(/"/g,'').trim());
+        // Smart CSV parser - handle kolom yang mengandung koma (dalam quotes)
+        const cols = parseCSVLine(lines[i]);
         if (cols.length < 2) { skipped++; continue; }
 
         // Support 2 format:
         // Format lama: SKU, HPP
         // Format baru (template varian): Model SKU, SKU Produk, Nama Varian, Nama Produk, HPP
-        let sku, hpp;
-        if (cols.length >= 5 && !isNaN(parseFloat(cols[4]))) {
-          // Format baru - kolom 1=Model SKU, kolom 5=HPP
-          sku = cols[0];
-          hpp = parseFloat(cols[4]);
+        let sku, hppRaw;
+        if (cols.length >= 5) {
+          sku    = cols[0].trim();
+          hppRaw = cols[4].trim();
         } else {
-          // Format lama - kolom 1=SKU, kolom 2=HPP
-          sku = cols[0];
-          hpp = parseFloat(cols[1]);
+          sku    = cols[0].trim();
+          hppRaw = cols[1].trim();
         }
 
+        // Parse angka - handle format Indonesia (1.500 atau 1,500 atau 1500)
+        const hpp = parseIDNumber(hppRaw);
         if (!sku || isNaN(hpp) || hpp < 0) { skipped++; continue; }
         S.hppMap[sku] = hpp;
         imported++;
