@@ -663,7 +663,13 @@ function setMonth(m, btn) {
   // Setelah render order, update juga escrow jika sudah ada
   function afterRender() {
     if (S.lastEscrowList?.length > 0) {
-      renderEscrowData(S.lastEscrowList, S.lastEscrowOrders);
+      // Rebuild allOrders dari semua bulan untuk referensi yang benar
+      const allOrders = [];
+      for (let mm = 1; mm <= 12; mm++) {
+        const d = loadMonthCache(S.year, mm);
+        if (d?.orders) allOrders.push(...d.orders);
+      }
+      renderEscrowData(S.lastEscrowList, allOrders.length > 0 ? allOrders : S.lastEscrowOrders);
     }
   }
 
@@ -1273,7 +1279,9 @@ async function loadEscrowData() {
     .map(o => S.escrowCache[o.order_sn])
     .filter(Boolean);
 
-  renderEscrowData(allEscrow, completedOrders);
+  // Kirim allOrdersAllMonths (bukan hanya completedOrders) sebagai referensi
+  // agar filter bulan di renderEscrowData bisa lookup create_time semua order
+  renderEscrowData(allEscrow, allOrdersAllMonths);
 
   document.getElementById('escrowLoading').style.display = 'none';
   document.getElementById('financeSummary').style.opacity = '1';
@@ -1300,24 +1308,27 @@ function renderEscrowData(escrowList, orders) {
   S.lastEscrowList = escrowList;
   S.lastEscrowOrders = orders;
 
-  // Filter sesuai bulan yang dipilih saat ini untuk KPI utama
+  // orderMap: lookup create_time per SN untuk filter bulan
   const orderMap = {};
   orders.forEach(o => orderMap[o.order_sn] = o);
 
+  // Juga cek dari escrowCache jika order tidak ada di orders
+  // Filter berdasarkan bulan yang dipilih
   let displayEscrow = escrowList;
   if (S.month !== 'all') {
-    const snsInMonth = new Set(
-      orders.filter(o => {
-        const d = new Date(o.create_time*1000);
-        return d.getFullYear()===S.year && (d.getMonth()+1)===parseInt(S.month);
-      }).map(o=>o.order_sn)
-    );
-    displayEscrow = escrowList.filter(e => snsInMonth.has(e.order_sn));
+    const m = parseInt(S.month);
+    displayEscrow = escrowList.filter(e => {
+      const order = orderMap[e.order_sn];
+      if (!order) return false;
+      const d = new Date(order.create_time*1000);
+      return d.getFullYear()===S.year && (d.getMonth()+1)===m;
+    });
   } else {
-    const snsInYear = new Set(
-      orders.filter(o => new Date(o.create_time*1000).getFullYear()===S.year).map(o=>o.order_sn)
-    );
-    displayEscrow = escrowList.filter(e => snsInYear.has(e.order_sn));
+    displayEscrow = escrowList.filter(e => {
+      const order = orderMap[e.order_sn];
+      if (!order) return false;
+      return new Date(order.create_time*1000).getFullYear()===S.year;
+    });
   }
 
   // Omset dari order data (sama dengan KPI utama), bukan buyer_total_amount escrow
