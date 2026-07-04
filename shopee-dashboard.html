@@ -516,17 +516,20 @@ window.addEventListener('load', async () => {
       updateMonthBtnCache();
       updateLastUpdate();
 
-      // Rebuild escrow setelah monthCache ter-load
+      // Rebuild escrow SETELAH semua cache ter-load
       rebuildLastEscrowFromCache();
 
       // Render dari cache yang sudah ada di memory
       const allOrders = getOrdersForDisplay();
       if (allOrders.length > 0) {
         renderAll(allOrders);
-        // Render escrow jika sudah ada
+        // Render escrow jika sudah ada (delay sedikit agar DOM siap)
         if (S.lastEscrowList?.length > 0) {
-          document.getElementById('financeCard').style.display = 'block';
-          renderEscrowData(S.lastEscrowList, S.lastEscrowOrders);
+          setTimeout(() => {
+            document.getElementById('financeCard').style.display = 'block';
+            renderEscrowData(S.lastEscrowList, S.lastEscrowOrders);
+            toast(`💵 Net income dari cache`, 'inf');
+          }, 300);
         }
         toast(`📦 ${allOrders.length} order dari cache`, 'inf');
       } else {
@@ -1175,8 +1178,15 @@ function fmtRp(n) {
   n = parseFloat(n)||0;
   if (n>=1e9) return 'Rp '+(n/1e9).toFixed(2)+'M';
   if (n>=1e6) return 'Rp '+(n/1e6).toFixed(2)+'jt';
-  if (n>=1e3) return 'Rp '+(n/1e3).toFixed(0)+'rb';
-  return 'Rp '+n.toFixed(0);
+  if (n>=1e3) return 'Rp '+Math.round(n).toLocaleString('id');
+  // Angka < 1000 tampilkan apa adanya (tidak dibulatkan ke ribuan)
+  return 'Rp '+Math.round(n).toLocaleString('id');
+}
+
+// Format rupiah dengan pemisah ribuan - untuk tabel & detail
+function fmtRpFull(n) {
+  n = parseFloat(n)||0;
+  return 'Rp '+Math.round(n).toLocaleString('id');
 }
 function fmtRpShort(n) {
   if (n>=1e9) return (n/1e9).toFixed(1)+'M';
@@ -1318,7 +1328,7 @@ function loadEscrowCacheFromStorage() {
 function rebuildLastEscrowFromCache() {
   if (!S.escrowCache || !Object.keys(S.escrowCache).length) return;
 
-  // Kumpulkan semua orders dari semua bulan
+  // Kumpulkan semua orders dari monthCache (memory)
   const allOrders = [];
   for (let m = 1; m <= 12; m++) {
     const mk = `${S.year}-${String(m).padStart(2,'0')}`;
@@ -1326,9 +1336,29 @@ function rebuildLastEscrowFromCache() {
     if (data?.orders) allOrders.push(...data.orders);
   }
 
-  if (!allOrders.length) return; // monthCache belum di-load
+  // Jika monthCache belum ada di memory, coba dari localStorage langsung
+  if (!allOrders.length) {
+    for (let m = 1; m <= 12; m++) {
+      try {
+        const mk = `${S.year}-${String(m).padStart(2,'0')}`;
+        const raw = localStorage.getItem(`shopee_m_${mk}`);
+        if (raw) {
+          const d = JSON.parse(raw);
+          if (d?.orders?.length) {
+            allOrders.push(...d.orders);
+            // Simpan ke memory juga
+            if (!S.monthCache[mk]) S.monthCache[mk] = d;
+          }
+        }
+      } catch(e) {}
+    }
+  }
 
-  // Build lastEscrowList dari escrowCache yang ada
+  if (!allOrders.length) {
+    console.log('rebuildLastEscrow: no orders in cache yet');
+    return;
+  }
+
   const escrowList = Object.values(S.escrowCache);
   S.lastEscrowList   = escrowList;
   S.lastEscrowOrders = allOrders;
@@ -1743,18 +1773,44 @@ function clearHpp() {
 function calcOrderHpp(order) {
   let total = 0;
   (order.items || []).forEach(it => {
-    const modelSku = it.model_sku;  // varian spesifik, misal "Cylinder PET 1200 ml Natural"
-    const sku      = it.sku;        // SKU produk umum, misal "Cylinder PET"
-    const qty      = it.qty || 1;
+    const modelSku = it.model_sku;  // varian spesifik: "Cylinder PET 1200 ml Natural"
+    const sku      = it.sku;        // SKU produk umum: "Cylinder PET"
+    const qty      = parseInt(it.qty) || 1;
+
+    let hppPerUnit = null;
 
     // Prioritas: model_sku → sku → tidak dihitung
     if (modelSku && S.hppMap[modelSku] !== undefined) {
-      total += S.hppMap[modelSku] * qty;
+      hppPerUnit = parseFloat(S.hppMap[modelSku]);
     } else if (sku && S.hppMap[sku] !== undefined) {
-      total += S.hppMap[sku] * qty;
+      hppPerUnit = parseFloat(S.hppMap[sku]);
+    }
+
+    if (hppPerUnit !== null && !isNaN(hppPerUnit)) {
+      total += hppPerUnit * qty; // HPP per unit × quantity
     }
   });
   return total;
+}
+
+// Debug HPP untuk 1 order - tampilkan di console
+function debugOrderHpp(orderSn) {
+  const allOrders = [];
+  for (let m = 1; m <= 12; m++) {
+    const d = loadMonthCache(S.year, m);
+    if (d?.orders) allOrders.push(...d.orders);
+  }
+  const order = allOrders.find(o => o.order_sn === orderSn);
+  if (!order) { console.log('Order tidak ditemukan'); return; }
+  console.log('Order:', orderSn);
+  (order.items||[]).forEach(it => {
+    const modelSku = it.model_sku;
+    const sku = it.sku;
+    const qty = it.qty || 1;
+    const hpp = S.hppMap[modelSku] ?? S.hppMap[sku] ?? 'tidak ada';
+    console.log(`  ${it.name} | model_sku: ${modelSku} | sku: ${sku} | qty: ${qty} | hpp/unit: ${hpp} | total: ${hpp !== 'tidak ada' ? hpp*qty : '-'}`);
+  });
+  console.log('Total HPP order:', calcOrderHpp(order));
 }
 </script>
 </body>
