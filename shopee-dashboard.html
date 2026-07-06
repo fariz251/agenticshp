@@ -335,6 +335,43 @@ tbody tr:hover td{background:#fafafa}
       <div style="font-size:24px;animation:spin .7s linear infinite;display:inline-block">⏳</div>
       <div style="margin-top:8px" id="escrowLoadingText">Mengambil data keuangan...</div>
     </div>
+
+    <!-- Detail Transaksi per Produk -->
+    <div style="margin-top:24px">
+      <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+        <div>
+          <div style="font-size:13px;font-weight:700">📋 Detail Transaksi per Produk</div>
+          <div style="font-size:12px;color:#6b7280;margin-top:2px" id="txDetailSub">Semua item dari order yang sudah dihitung</div>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center">
+          <input type="text" id="txSearch" placeholder="🔍 Cari produk/invoice/SKU..." 
+            style="padding:6px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;outline:none;width:220px"
+            oninput="filterTxTable()">
+          <button class="btn btn-ghost" style="font-size:12px" onclick="exportTxCSV()">📥 Export</button>
+        </div>
+      </div>
+      <div class="tbl-wrap" style="max-height:500px;overflow-y:auto">
+        <table id="txDetailTable" style="font-size:12px">
+          <thead style="position:sticky;top:0;z-index:10">
+            <tr>
+              <th style="cursor:pointer;white-space:nowrap" onclick="sortTxTable('date')">Tanggal ↕</th>
+              <th style="cursor:pointer" onclick="sortTxTable('sn')">Invoice ↕</th>
+              <th onclick="sortTxTable('product')">Produk / Varian</th>
+              <th style="cursor:pointer;text-align:center" onclick="sortTxTable('qty')">Qty ↕</th>
+              <th style="cursor:pointer;text-align:right" onclick="sortTxTable('price')">Harga Jual ↕</th>
+              <th style="cursor:pointer;text-align:right" onclick="sortTxTable('omset')">Omset ↕</th>
+              <th style="cursor:pointer;text-align:right" onclick="sortTxTable('pencairan')">Pencairan ↕</th>
+              <th style="cursor:pointer;text-align:right" onclick="sortTxTable('hpp')">HPP ↕</th>
+              <th style="cursor:pointer;text-align:right;background:#ecfeff" onclick="sortTxTable('profit')">Profit ↕</th>
+            </tr>
+          </thead>
+          <tbody id="txDetailBody">
+            <tr><td colspan="9" style="text-align:center;padding:24px;color:#9ca3af">Klik "Hitung ▶" untuk muat data</td></tr>
+          </tbody>
+          <tfoot id="txDetailFoot" style="position:sticky;bottom:0;background:var(--bg)"></tfoot>
+        </table>
+      </div>
+    </div>
   </div>
 
   <!-- Top Products -->
@@ -1446,8 +1483,10 @@ function renderEscrowData(escrowList, orders) {
   document.getElementById('financeSub').textContent =
     `${displayEscrow.length} order · ${period} · Margin ${margin}%${hasHpp?` · Profit ${profitMargin}%`:''}`;
 
-  // ── Breakdown per bulan (selalu dari SEMUA data, bukan cuma yang ditampilkan) ──
+  // ── Breakdown per bulan ──
   renderMonthlyFinanceTable(escrowList, orders);
+  // ── Detail transaksi per produk ──
+  renderTxTable(escrowList, orders);
 
   // Chart: Omset vs Net Income
   const ctx1 = document.getElementById('chartFinance').getContext('2d');
@@ -1866,6 +1905,187 @@ function debugOrderHpp(orderSn) {
     console.log(`  ${it.name} | model_sku: ${modelSku} | sku: ${sku} | qty: ${qty} | hpp/unit: ${hpp} | total: ${hpp !== 'tidak ada' ? hpp*qty : '-'}`);
   });
   console.log('Total HPP order:', calcOrderHpp(order));
+}
+
+// ═══════════════════════════════════════════════════════════════════
+// DETAIL TRANSAKSI PER PRODUK
+// ═══════════════════════════════════════════════════════════════════
+S.txData      = [];   // data mentah semua rows
+S.txFiltered  = [];   // setelah filter search
+S.txSortKey   = 'date';
+S.txSortDir   = -1;   // descending (terbaru dulu)
+
+function buildTxData(escrowList, orders) {
+  const orderMap  = {};
+  const escrowMap = {};
+  orders.forEach(o => orderMap[o.order_sn] = o);
+  escrowList.forEach(e => escrowMap[e.order_sn] = e);
+
+  const rows = [];
+
+  orders.forEach(order => {
+    if (!['COMPLETED','TO_CONFIRM_RECEIVE','SHIPPED','READY_TO_SHIP','PROCESSED'].includes(order.order_status)) return;
+
+    const escrow   = escrowMap[order.order_sn];
+    const items    = order.items || [];
+    const totalQty = items.reduce((s,i) => s+(i.qty||1), 0);
+
+    // Pencairan per order (dari escrow)
+    const pencairan = escrow ? escrow.escrow_amount : null;
+
+    // HPP per order
+    const hppTotal = calcOrderHpp(order);
+
+    items.forEach(item => {
+      const qty       = item.qty || 1;
+      const hargaJual = parseFloat(item.price || 0);
+      const omsetItem = hargaJual * qty;
+
+      // Alokasi pencairan proporsional per item (berdasarkan porsi omset)
+      const orderOmset  = parseFloat(order.total_amount || 0);
+      const pencairanItem = (pencairan !== null && orderOmset > 0)
+        ? pencairan * (omsetItem / orderOmset) : null;
+
+      // HPP per item
+      const modelSku  = item.model_sku || item.sku;
+      const skuKey    = item.sku;
+      let hppPerUnit  = S.hppMap[modelSku] ?? S.hppMap[skuKey] ?? null;
+      const hppItem   = hppPerUnit !== null ? hppPerUnit * qty : null;
+      const profitItem= (pencairanItem !== null && hppItem !== null)
+        ? pencairanItem - hppItem : null;
+
+      rows.push({
+        date:       order.create_time,
+        sn:         order.order_sn,
+        status:     order.order_status,
+        product:    item.name || '-',
+        variant:    item.model_name || '',
+        sku:        item.sku || '-',
+        model_sku:  item.model_sku || item.sku || '-',
+        qty,
+        price:      hargaJual,
+        omset:      omsetItem,
+        pencairan:  pencairanItem,
+        hpp:        hppItem,
+        profit:     profitItem,
+      });
+    });
+  });
+
+  return rows;
+}
+
+function renderTxTable(escrowList, orders) {
+  S.txData     = buildTxData(escrowList, orders);
+  S.txFiltered = [...S.txData];
+  sortAndRenderTx();
+  updateTxSub();
+}
+
+function filterTxTable() {
+  const q = document.getElementById('txSearch').value.toLowerCase().trim();
+  S.txFiltered = q
+    ? S.txData.filter(r =>
+        r.sn.toLowerCase().includes(q) ||
+        r.product.toLowerCase().includes(q) ||
+        r.sku.toLowerCase().includes(q) ||
+        r.model_sku.toLowerCase().includes(q) ||
+        r.variant.toLowerCase().includes(q))
+    : [...S.txData];
+  sortAndRenderTx();
+  updateTxSub();
+}
+
+function sortTxTable(key) {
+  if (S.txSortKey === key) S.txSortDir *= -1;
+  else { S.txSortKey = key; S.txSortDir = -1; }
+  sortAndRenderTx();
+}
+
+function sortAndRenderTx() {
+  const key = S.txSortKey;
+  S.txFiltered.sort((a,b) => {
+    const av = a[key] ?? -Infinity;
+    const bv = b[key] ?? -Infinity;
+    if (typeof av === 'string') return av.localeCompare(bv) * S.txSortDir;
+    return (av - bv) * S.txSortDir;
+  });
+
+  const tbody = document.getElementById('txDetailBody');
+  const MAX   = 500;
+  const rows  = S.txFiltered.slice(0, MAX);
+
+  const hasHpp = Object.keys(S.hppMap).length > 0;
+
+  const bc = s => ({
+    COMPLETED:'b-done', SHIPPED:'b-ship', TO_CONFIRM_RECEIVE:'b-ship',
+    READY_TO_SHIP:'b-ship', PROCESSED:'b-proc'
+  }[s] || 'b-default');
+
+  tbody.innerHTML = rows.map(r => {
+    const dt = new Date(r.date*1000).toLocaleDateString('id-ID',{day:'2-digit',month:'short'});
+    const profitColor = r.profit === null ? '#9ca3af'
+                      : r.profit >= 0    ? '#059669' : '#dc2626';
+    return `<tr>
+      <td style="white-space:nowrap;color:var(--sub)">${dt}</td>
+      <td style="font-family:monospace;font-size:11px;color:var(--sub)">${r.sn}</td>
+      <td>
+        <div style="font-weight:600;font-size:12px">${r.product}</div>
+        ${r.variant ? `<div style="font-size:10px;color:var(--sub)">${r.variant}</div>` : ''}
+        <div style="font-size:10px;color:#9ca3af">${r.model_sku}</div>
+      </td>
+      <td style="text-align:center;font-weight:700">${r.qty}</td>
+      <td style="text-align:right">${fmtRpFull(r.price)}</td>
+      <td style="text-align:right;font-weight:600">${fmtRpFull(r.omset)}</td>
+      <td style="text-align:right;color:#059669;font-weight:600">${r.pencairan!==null ? fmtRpFull(r.pencairan) : '<span style="color:#9ca3af">—</span>'}</td>
+      <td style="text-align:right;color:#dc2626">${hasHpp && r.hpp!==null ? fmtRpFull(r.hpp) : '<span style="color:#9ca3af">—</span>'}</td>
+      <td style="text-align:right;font-weight:800;color:${profitColor};background:#ecfeff44">${r.profit!==null ? fmtRpFull(r.profit) : '<span style="color:#9ca3af">—</span>'}</td>
+    </tr>`;
+  }).join('');
+
+  // Footer total
+  const tfoot = document.getElementById('txDetailFoot');
+  const totOmset     = S.txFiltered.reduce((s,r)=>s+r.omset,0);
+  const totPencairan = S.txFiltered.filter(r=>r.pencairan!==null).reduce((s,r)=>s+r.pencairan,0);
+  const totHpp       = S.txFiltered.filter(r=>r.hpp!==null).reduce((s,r)=>s+r.hpp,0);
+  const totProfit    = S.txFiltered.filter(r=>r.profit!==null).reduce((s,r)=>s+r.profit,0);
+  const totQty       = S.txFiltered.reduce((s,r)=>s+r.qty,0);
+  const hasPencairan = S.txFiltered.some(r=>r.pencairan!==null);
+
+  tfoot.innerHTML = `<tr style="font-weight:800;font-size:12px;border-top:2px solid var(--border)">
+    <td colspan="3" style="padding:10px 14px">TOTAL (${S.txFiltered.length} baris${S.txFiltered.length>=MAX?', maks '+MAX:''})</td>
+    <td style="text-align:center">${totQty.toLocaleString('id')}</td>
+    <td></td>
+    <td style="text-align:right">${fmtRpFull(totOmset)}</td>
+    <td style="text-align:right;color:#059669">${hasPencairan ? fmtRpFull(totPencairan) : '—'}</td>
+    <td style="text-align:right;color:#dc2626">${hasHpp ? fmtRpFull(totHpp) : '—'}</td>
+    <td style="text-align:right;color:#0891b2;background:#ecfeff">${hasHpp && hasPencairan ? fmtRpFull(totProfit) : '—'}</td>
+  </tr>`;
+}
+
+function updateTxSub() {
+  document.getElementById('txDetailSub').textContent =
+    `${S.txFiltered.length} baris dari ${S.txData.length} total item`;
+}
+
+function exportTxCSV() {
+  if (!S.txFiltered.length) { toast('Tidak ada data','err'); return; }
+  const head = ['Tanggal','Invoice','Status','Produk','Varian','SKU','Model SKU','Qty','Harga Jual','Omset','Pencairan','HPP','Profit'];
+  const rows = S.txFiltered.map(r => [
+    new Date(r.date*1000).toLocaleDateString('id-ID'),
+    r.sn, r.status, r.product, r.variant, r.sku, r.model_sku,
+    r.qty, Math.round(r.price), Math.round(r.omset),
+    r.pencairan!==null ? Math.round(r.pencairan) : '',
+    r.hpp!==null       ? Math.round(r.hpp)       : '',
+    r.profit!==null    ? Math.round(r.profit)    : '',
+  ]);
+  const csv = [head,...rows].map(r=>r.map(v=>`"${v}"`).join(',')).join('\n');
+  const a = Object.assign(document.createElement('a'),{
+    href: URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8;'})),
+    download: `transaksi_${S.year}_${S.month}.csv`
+  });
+  a.click();
+  toast('✅ CSV didownload','ok');
 }
 </script>
 </body>
