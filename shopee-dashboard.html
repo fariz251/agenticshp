@@ -1989,9 +1989,19 @@ function buildTxData(escrowList, orders) {
       const modelSku  = item.model_sku || item.sku;
       const skuKey    = item.sku;
       let hppPerUnit  = S.hppMap[modelSku] ?? S.hppMap[skuKey] ?? null;
-      const hppItem   = hppPerUnit !== null ? hppPerUnit * qty : null;
-      const profitItem= (pencairanItem !== null && hppItem !== null)
-        ? pencairanItem - hppItem : null;
+
+      let hppItem, profitItem;
+
+      if (pencairanItem !== null && pencairanItem < 0) {
+        // Kondisi RETUR — pencairan minus, HPP = 0
+        // Barang sudah dikembalikan, tidak ada HPP yang keluar
+        hppItem    = 0;
+        profitItem = pencairanItem; // profit = pencairan (negatif)
+      } else {
+        hppItem    = hppPerUnit !== null ? hppPerUnit * qty : null;
+        profitItem = (pencairanItem !== null && hppItem !== null)
+          ? pencairanItem - hppItem : null;
+      }
 
       rows.push({
         date:       order.create_time,
