@@ -1940,8 +1940,11 @@ function buildTxData(escrowList, orders) {
 
   const rows = [];
 
+  // Status yang valid untuk ditampilkan di tabel transaksi
+  const VALID_TX = new Set(['COMPLETED','TO_CONFIRM_RECEIVE','SHIPPED','READY_TO_SHIP','PROCESSED','IN_CANCEL']);
+
   orders.forEach(order => {
-    if (!['COMPLETED','TO_CONFIRM_RECEIVE','SHIPPED','READY_TO_SHIP','PROCESSED'].includes(order.order_status)) return;
+    if (!VALID_TX.has(order.order_status)) return; // skip CANCELLED, TO_RETURN, UNPAID
 
     const escrow   = escrowMap[order.order_sn];
     const items    = order.items || [];
@@ -1960,8 +1963,15 @@ function buildTxData(escrowList, orders) {
 
       // Alokasi pencairan proporsional per item (berdasarkan porsi omset)
       const orderOmset  = parseFloat(order.total_amount || 0);
-      const pencairanItem = (pencairan !== null && orderOmset > 0)
-        ? pencairan * (omsetItem / orderOmset) : null;
+      let pencairanItem = null;
+      if (pencairan !== null && orderOmset > 0) {
+        // Alokasi proporsional - jika pencairan negatif (refund), tetap proporsional
+        pencairanItem = pencairan * (omsetItem / orderOmset);
+      } else if (pencairan !== null && orderOmset === 0) {
+        // Order gratis/promo - pencairan dibagi rata per item
+        const totalItems = items.length || 1;
+        pencairanItem = pencairan / totalItems;
+      }
 
       // HPP per item
       const modelSku  = item.model_sku || item.sku;
