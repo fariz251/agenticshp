@@ -2156,6 +2156,31 @@ function exportTxCSV() {
   a.click();
   toast('✅ CSV didownload','ok');
 }
+
+// Expose ke window agar accessible dari Console & onclick
+window.sortAndRenderTx   = sortAndRenderTx;
+window.filterTxTable     = filterTxTable;
+window.sortTxTable       = sortTxTable;
+window.exportTxCSV       = exportTxCSV;
+window.loadEscrowData    = loadEscrowData;
+window.clearAllCache     = clearAllCache;
+window.toggleHppPanel    = toggleHppPanel;
+window.toggleCachePanel  = toggleCachePanel;
+window.fetchAllMonths    = fetchAllMonths;
+window.refreshData       = refreshData;
+window.loadDemo          = loadDemo;
+window.saveConfig        = saveConfig;
+window.openSetup         = openSetup;
+window.closeSetup        = closeSetup;
+window.setMonth          = setMonth;
+window.onYearChange      = onYearChange;
+window.sortFinanceTable  = sortFinanceTable;
+window.exportCSV         = exportCSV;
+window.clearHpp          = clearHpp;
+window.downloadHppTemplate = downloadHppTemplate;
+window.handleHppUpload   = handleHppUpload;
+window.openAuthTab       = openAuthTab;
+window.S                 = S; // expose state untuk debugging
 </script>
 </body>
 </html>
