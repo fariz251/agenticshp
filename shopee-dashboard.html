@@ -1956,21 +1956,33 @@ function buildTxData(escrowList, orders) {
     // HPP per order
     const hppTotal = calcOrderHpp(order);
 
+    // Gunakan buyer_total_amount dari escrow sebagai basis alokasi
+    // Lebih akurat dari order.total_amount
+    const escrowBasis = escrow
+      ? parseFloat(escrow.buyer_total_amount || 0)
+      : parseFloat(order.total_amount || 0);
+
+    // Hitung total omset semua item untuk alokasi proporsional
+    const totalItemOmset = items.reduce((s,it) => {
+      return s + (parseFloat(it.price||0) * (it.qty||1));
+    }, 0);
+
     items.forEach(item => {
       const qty       = item.qty || 1;
       const hargaJual = parseFloat(item.price || 0);
       const omsetItem = hargaJual * qty;
 
-      // Alokasi pencairan proporsional per item (berdasarkan porsi omset)
-      const orderOmset  = parseFloat(order.total_amount || 0);
+      // Alokasi pencairan proporsional per item
+      // Gunakan totalItemOmset sebagai pembagi (lebih akurat)
       let pencairanItem = null;
-      if (pencairan !== null && orderOmset > 0) {
-        // Alokasi proporsional - jika pencairan negatif (refund), tetap proporsional
-        pencairanItem = pencairan * (omsetItem / orderOmset);
-      } else if (pencairan !== null && orderOmset === 0) {
-        // Order gratis/promo - pencairan dibagi rata per item
-        const totalItems = items.length || 1;
-        pencairanItem = pencairan / totalItems;
+      if (pencairan !== null) {
+        if (totalItemOmset > 0) {
+          // Proporsional berdasarkan kontribusi omset item
+          pencairanItem = pencairan * (omsetItem / totalItemOmset);
+        } else if (items.length > 0) {
+          // Bagi rata jika semua item harga 0
+          pencairanItem = pencairan / items.length;
+        }
       }
 
       // HPP per item
