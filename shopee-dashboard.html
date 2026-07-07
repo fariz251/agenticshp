@@ -343,9 +343,25 @@ tbody tr:hover td{background:#fafafa}
           <div style="font-size:13px;font-weight:700">📋 Detail Transaksi per Produk</div>
           <div style="font-size:12px;color:#6b7280;margin-top:2px" id="txDetailSub">Semua item dari order yang sudah dihitung</div>
         </div>
-        <div style="display:flex;gap:8px;align-items:center">
+        <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+          <select id="txMonthFilter" onchange="filterTxTable()"
+            style="padding:6px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;outline:none;background:var(--surface);cursor:pointer">
+            <option value="all">📅 Semua Bulan</option>
+            <option value="1">Januari</option>
+            <option value="2">Februari</option>
+            <option value="3">Maret</option>
+            <option value="4">April</option>
+            <option value="5">Mei</option>
+            <option value="6">Juni</option>
+            <option value="7">Juli</option>
+            <option value="8">Agustus</option>
+            <option value="9">September</option>
+            <option value="10">Oktober</option>
+            <option value="11">November</option>
+            <option value="12">Desember</option>
+          </select>
           <input type="text" id="txSearch" placeholder="🔍 Cari produk/invoice/SKU..." 
-            style="padding:6px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;outline:none;width:220px"
+            style="padding:6px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;outline:none;width:200px"
             oninput="filterTxTable()">
           <button class="btn btn-ghost" style="font-size:12px" onclick="exportTxCSV()">📥 Export</button>
         </div>
@@ -715,16 +731,17 @@ function setMonth(m, btn) {
       rebuildLastEscrowFromCache();
     }
     if (S.lastEscrowList?.length > 0) {
-      // Rebuild allOrders dari semua bulan untuk referensi yang benar
       const allOrders = [];
       for (let mm = 1; mm <= 12; mm++) {
         const d = loadMonthCache(S.year, mm);
         if (d?.orders) allOrders.push(...d.orders);
       }
       const ref = allOrders.length > 0 ? allOrders : S.lastEscrowOrders;
-      S.lastEscrowOrders = ref; // update referensi
+      S.lastEscrowOrders = ref;
       renderEscrowData(S.lastEscrowList, ref);
       document.getElementById('financeCard').style.display = 'block';
+      // Sync filter bulan tabel dengan pilihan utama
+      setTimeout(syncTxMonthFilter, 100);
     }
   }
 
@@ -1983,17 +2000,37 @@ function renderTxTable(escrowList, orders) {
 }
 
 function filterTxTable() {
-  const q = document.getElementById('txSearch').value.toLowerCase().trim();
-  S.txFiltered = q
-    ? S.txData.filter(r =>
-        r.sn.toLowerCase().includes(q) ||
-        r.product.toLowerCase().includes(q) ||
-        r.sku.toLowerCase().includes(q) ||
-        r.model_sku.toLowerCase().includes(q) ||
-        r.variant.toLowerCase().includes(q))
-    : [...S.txData];
+  const q  = document.getElementById('txSearch').value.toLowerCase().trim();
+  const mf = document.getElementById('txMonthFilter').value;
+
+  S.txFiltered = S.txData.filter(r => {
+    // Filter bulan
+    if (mf !== 'all') {
+      const d = new Date(r.date * 1000);
+      if (d.getMonth() + 1 !== parseInt(mf)) return false;
+    }
+    // Filter search
+    if (q) {
+      return r.sn.toLowerCase().includes(q) ||
+             r.product.toLowerCase().includes(q) ||
+             r.sku.toLowerCase().includes(q) ||
+             r.model_sku.toLowerCase().includes(q) ||
+             r.variant.toLowerCase().includes(q);
+    }
+    return true;
+  });
+
   sortAndRenderTx();
   updateTxSub();
+}
+
+// Sync filter bulan tabel dengan pilihan bulan di filter bar utama
+function syncTxMonthFilter() {
+  const sel = document.getElementById('txMonthFilter');
+  if (!sel) return;
+  if (S.month === 'all') sel.value = 'all';
+  else sel.value = String(S.month);
+  filterTxTable();
 }
 
 function sortTxTable(key) {
