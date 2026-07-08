@@ -1665,6 +1665,7 @@ function loadHppFromStorage() {
   try {
     const raw = localStorage.getItem('shopee_hpp_map');
     if (raw) S.hppMap = JSON.parse(raw);
+    S._hppNormMap = null; // reset normalized map
   } catch(e) { S.hppMap = {}; }
   updateHppStatus();
   // Rebuild txData dengan HPP baru jika data sudah ada
@@ -1678,6 +1679,7 @@ function loadHppFromStorage() {
 function saveHppToStorage() {
   try {
     localStorage.setItem('shopee_hpp_map', JSON.stringify(S.hppMap));
+    S._hppNormMap = null; // reset normalized map
   } catch(e) { console.warn('HPP save failed:', e.message); }
 }
 
@@ -1892,24 +1894,45 @@ function clearHpp() {
 }
 
 // Hitung total HPP untuk 1 order berdasarkan items-nya
+// Build normalized HPP lookup map (lazy, rebuild saat hppMap berubah)
+S._hppNormMap = null;
+
+function getNormHppMap() {
+  if (S._hppNormMap) return S._hppNormMap;
+  S._hppNormMap = {};
+  Object.entries(S.hppMap).forEach(([k, v]) => {
+    // Simpan dengan key original, trimmed, dan lowercase
+    const norm = k.trim().toLowerCase().replace(/\s+/g,' ');
+    S._hppNormMap[k]    = v; // original
+    S._hppNormMap[norm] = v; // normalized
+  });
+  return S._hppNormMap;
+}
+
+function lookupHpp(sku) {
+  if (!sku || sku === '-') return null;
+  const map  = getNormHppMap();
+  const norm = sku.trim().toLowerCase().replace(/\s+/g,' ');
+  // Coba: original → normalized → tanpa spasi → tanpa underscore
+  return map[sku]
+      ?? map[norm]
+      ?? map[sku.trim()]
+      ?? map[norm.replace(/_/g,' ')]
+      ?? map[norm.replace(/\s/g,'_')]
+      ?? null;
+}
+
 function calcOrderHpp(order) {
   let total = 0;
   (order.items || []).forEach(it => {
-    const modelSku = it.model_sku;  // varian spesifik: "Cylinder PET 1200 ml Natural"
-    const sku      = it.sku;        // SKU produk umum: "Cylinder PET"
+    const modelSku = it.model_sku;
+    const sku      = it.sku;
     const qty      = parseInt(it.qty) || 1;
 
-    let hppPerUnit = null;
-
-    // Prioritas: model_sku → sku → tidak dihitung
-    if (modelSku && S.hppMap[modelSku] !== undefined) {
-      hppPerUnit = parseFloat(S.hppMap[modelSku]);
-    } else if (sku && S.hppMap[sku] !== undefined) {
-      hppPerUnit = parseFloat(S.hppMap[sku]);
-    }
+    let hppPerUnit = lookupHpp(modelSku) ?? lookupHpp(sku) ?? null;
 
     if (hppPerUnit !== null && !isNaN(hppPerUnit)) {
-      total += hppPerUnit * qty; // HPP per unit × quantity
+      total += parseFloat(hppPerUnit) * qty;
     }
   });
   return total;
