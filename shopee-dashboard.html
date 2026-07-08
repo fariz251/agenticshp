@@ -1667,6 +1667,12 @@ function loadHppFromStorage() {
     if (raw) S.hppMap = JSON.parse(raw);
   } catch(e) { S.hppMap = {}; }
   updateHppStatus();
+  // Rebuild txData dengan HPP baru jika data sudah ada
+  if (S.lastEscrowList?.length > 0) {
+    setTimeout(() => rebuildTxWithCurrentHpp(), 100);
+    setTimeout(() => renderMonthlyFinanceTable(S.lastEscrowList, S.lastEscrowOrders), 150);
+    setTimeout(() => renderEscrowData(S.lastEscrowList, S.lastEscrowOrders), 200);
+  }
 }
 
 function saveHppToStorage() {
@@ -1826,9 +1832,14 @@ function handleHppUpload(event) {
       renderHppPreview();
       toast(`✅ ${imported} SKU HPP diimport${skipped>0?`, ${skipped} dilewati`:''}`, 'ok');
 
-      // Auto recalculate jika sudah ada escrow data
-      if (S.lastEscrowList) {
-        renderEscrowData(S.lastEscrowList, S.lastEscrowOrders);
+      // Re-render semua yang terkait HPP
+      if (S.txData?.length > 0) {
+        // Rebuild txData dengan HPP baru
+        if (S.lastEscrowList?.length > 0 && S.lastEscrowOrders?.length > 0) {
+          renderTxTable(S.lastEscrowList, S.lastEscrowOrders);
+          renderMonthlyFinanceTable(S.lastEscrowList, S.lastEscrowOrders);
+          renderEscrowData(S.lastEscrowList, S.lastEscrowOrders);
+        }
       }
 
     } catch(err) {
@@ -2025,10 +2036,22 @@ function buildTxData(escrowList, orders) {
 }
 
 function renderTxTable(escrowList, orders) {
+  // Selalu rebuild dengan hppMap terbaru
   S.txData     = buildTxData(escrowList, orders);
   S.txFiltered = [...S.txData];
   sortAndRenderTx();
   updateTxSub();
+}
+
+// Rebuild txData dengan HPP terbaru tanpa fetch ulang
+function rebuildTxWithCurrentHpp() {
+  if (!S.lastEscrowList?.length || !S.lastEscrowOrders?.length) return;
+  S.txData     = buildTxData(S.lastEscrowList, S.lastEscrowOrders);
+  S.txFiltered = [...S.txData];
+  filterTxTable(); // apply filter yang aktif
+  sortAndRenderTx();
+  updateTxSub();
+  console.log('txData rebuilt with latest hppMap:', Object.keys(S.hppMap).length, 'SKU');
 }
 
 function filterTxTable() {
@@ -2107,7 +2130,7 @@ function sortAndRenderTx() {
       <td style="text-align:right">${fmtRpFull(r.price)}</td>
       <td style="text-align:right;font-weight:600">${fmtRpFull(r.omset)}</td>
       <td style="text-align:right;color:#059669;font-weight:600">${r.pencairan!==null ? fmtRpFull(r.pencairan) : '<span style="color:#9ca3af">—</span>'}</td>
-      <td style="text-align:right;color:#dc2626">${hasHpp && r.hpp!==null ? fmtRpFull(r.hpp) : '<span style="color:#9ca3af">—</span>'}</td>
+      <td style="text-align:right;color:#dc2626">${r.hpp!==null ? fmtRpFull(r.hpp) : '<span style="color:#9ca3af">—</span>'}</td>
       <td style="text-align:right;font-weight:800;color:${profitColor};background:#ecfeff44">${r.profit!==null ? fmtRpFull(r.profit) : '<span style="color:#9ca3af">—</span>'}</td>
     </tr>`;
   }).join('');
@@ -2127,8 +2150,8 @@ function sortAndRenderTx() {
     <td></td>
     <td style="text-align:right">${fmtRpFull(totOmset)}</td>
     <td style="text-align:right;color:#059669">${hasPencairan ? fmtRpFull(totPencairan) : '—'}</td>
-    <td style="text-align:right;color:#dc2626">${hasHpp ? fmtRpFull(totHpp) : '—'}</td>
-    <td style="text-align:right;color:#0891b2;background:#ecfeff">${hasHpp && hasPencairan ? fmtRpFull(totProfit) : '—'}</td>
+    <td style="text-align:right;color:#dc2626">${fmtRpFull(totHpp)}</td>
+    <td style="text-align:right;color:#0891b2;background:#ecfeff">${hasPencairan ? fmtRpFull(totProfit) : '—'}</td>
   </tr>`;
 }
 
@@ -2158,7 +2181,8 @@ function exportTxCSV() {
 }
 
 // Expose ke window agar accessible dari Console & onclick
-window.sortAndRenderTx   = sortAndRenderTx;
+window.sortAndRenderTx         = sortAndRenderTx;
+window.rebuildTxWithCurrentHpp = rebuildTxWithCurrentHpp;
 window.filterTxTable     = filterTxTable;
 window.sortTxTable       = sortTxTable;
 window.exportTxCSV       = exportTxCSV;
