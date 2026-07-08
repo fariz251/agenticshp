@@ -360,6 +360,13 @@ tbody tr:hover td{background:#fafafa}
             <option value="11">November</option>
             <option value="12">Desember</option>
           </select>
+          <select id="txHppFilter" onchange="filterTxTable()"
+            style="padding:6px 10px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;outline:none;background:var(--surface);cursor:pointer">
+            <option value="all">Semua</option>
+            <option value="no_sku">⚠️ Tanpa SKU</option>
+            <option value="no_hpp">🔴 HPP Kosong</option>
+            <option value="has_hpp">✅ Ada HPP</option>
+          </select>
           <input type="text" id="txSearch" placeholder="🔍 Cari produk/invoice/SKU..." 
             style="padding:6px 12px;border:1.5px solid var(--border);border-radius:8px;font-size:12px;outline:none;width:200px"
             oninput="filterTxTable()">
@@ -2078,8 +2085,9 @@ function rebuildTxWithCurrentHpp() {
 }
 
 function filterTxTable() {
-  const q  = document.getElementById('txSearch').value.toLowerCase().trim();
-  const mf = document.getElementById('txMonthFilter').value;
+  const q   = document.getElementById('txSearch').value.toLowerCase().trim();
+  const mf  = document.getElementById('txMonthFilter').value;
+  const hf  = document.getElementById('txHppFilter')?.value || 'all';
 
   S.txFiltered = S.txData.filter(r => {
     // Filter bulan
@@ -2087,6 +2095,10 @@ function filterTxTable() {
       const d = new Date(r.date * 1000);
       if (d.getMonth() + 1 !== parseInt(mf)) return false;
     }
+    // Filter HPP status
+    if (hf === 'no_sku'  && !(r.model_sku === '-' || !r.model_sku)) return false;
+    if (hf === 'no_hpp'  && !(r.hpp === null && r.model_sku !== '-')) return false;
+    if (hf === 'has_hpp' && r.hpp === null) return false;
     // Filter search
     if (q) {
       return r.sn.toLowerCase().includes(q) ||
@@ -2141,13 +2153,21 @@ function sortAndRenderTx() {
     const dt = new Date(r.date*1000).toLocaleDateString('id-ID',{day:'2-digit',month:'short'});
     const profitColor = r.profit === null ? '#9ca3af'
                       : r.profit >= 0    ? '#059669' : '#dc2626';
-    return `<tr>
+    const noSku    = r.model_sku === '-' || !r.model_sku;
+    const noHppData = r.hpp === null && !noSku;
+    const rowBg    = noSku ? 'background:#fffbeb' : noHppData ? 'background:#fff0f0' : '';
+
+    return `<tr style="${rowBg}">
       <td style="white-space:nowrap;color:var(--sub)">${dt}</td>
       <td style="font-family:monospace;font-size:11px;color:var(--sub)">${r.sn}</td>
       <td>
         <div style="font-weight:600;font-size:12px">${r.product}</div>
         ${r.variant ? `<div style="font-size:10px;color:var(--sub)">${r.variant}</div>` : ''}
-        <div style="font-size:10px;color:#9ca3af">${r.model_sku}</div>
+        <div style="font-size:10px;color:#9ca3af;display:flex;align-items:center;gap:4px">
+          ${r.model_sku}
+          ${noSku ? '<span style="background:#fef3c7;color:#92400e;font-size:9px;padding:1px 5px;border-radius:4px;font-weight:700">⚠️ TANPA SKU</span>' : ''}
+          ${noHppData ? '<span style="background:#fee2e2;color:#991b1b;font-size:9px;padding:1px 5px;border-radius:4px;font-weight:700">HPP KOSONG</span>' : ''}
+        </div>
       </td>
       <td style="text-align:center;font-weight:700">${r.qty}</td>
       <td style="text-align:right">${fmtRpFull(r.price)}</td>
@@ -2179,8 +2199,12 @@ function sortAndRenderTx() {
 }
 
 function updateTxSub() {
-  document.getElementById('txDetailSub').textContent =
-    `${S.txFiltered.length} baris dari ${S.txData.length} total item`;
+  const noSku = S.txData.filter(r => r.model_sku === '-' || !r.model_sku).length;
+  const noHpp = S.txData.filter(r => r.hpp === null && r.model_sku !== '-').length;
+  let info = `${S.txFiltered.length} baris dari ${S.txData.length} total`;
+  if (noSku > 0)  info += ` · <span style="color:#d97706">⚠️ ${noSku} tanpa SKU</span>`;
+  if (noHpp > 0) info += ` · <span style="color:#dc2626">🔴 ${noHpp} HPP kosong</span>`;
+  document.getElementById('txDetailSub').innerHTML = info;
 }
 
 function exportTxCSV() {
