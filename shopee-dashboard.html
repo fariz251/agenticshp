@@ -315,8 +315,10 @@ tbody tr:hover td{background:#fafafa}
           <thead>
             <tr>
               <th style="cursor:pointer" onclick="sortFinanceTable('month')">Bulan ↕</th>
-              <th style="cursor:pointer;text-align:right" onclick="sortFinanceTable('omset')">Omset ↕</th>
-              <th style="cursor:pointer;text-align:right" onclick="sortFinanceTable('net')">Net Income ↕</th>
+              <th style="cursor:pointer;text-align:right" onclick="sortFinanceTable('omsetPlus')">Omset + ↕</th>
+              <th style="cursor:pointer;text-align:right;color:#dc2626" onclick="sortFinanceTable('omsetMinus')">Omset − ↕</th>
+              <th style="cursor:pointer;text-align:right" onclick="sortFinanceTable('omset')">Omset Net ↕</th>
+              <th style="cursor:pointer;text-align:right" onclick="sortFinanceTable('net')">Cair ↕</th>
               <th style="cursor:pointer;text-align:right" onclick="sortFinanceTable('hpp')">HPP ↕</th>
               <th style="cursor:pointer;text-align:right;background:#ecfeff" onclick="sortFinanceTable('profit')">Net Profit ↕</th>
               <th style="cursor:pointer;text-align:right" onclick="sortFinanceTable('margin')">Margin ↕</th>
@@ -1576,19 +1578,35 @@ function renderMonthlyFinanceTable(escrowList, orders) {
     if (!order) return;
     const d = new Date(order.create_time * 1000);
     const mk = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`;
-    if (!byMonth[mk]) byMonth[mk] = { month: mk, omset:0, net:0, hpp:0, commission:0, service:0, orders:0 };
+    if (!byMonth[mk]) byMonth[mk] = {
+      month: mk, omset:0, omsetPlus:0, omsetMinus:0,
+      net:0, netPlus:0, netMinus:0,
+      hpp:0, commission:0, service:0,
+      orders:0, orderPlus:0, orderMinus:0
+    };
+    const isRetur = e.escrow_amount < 0;
     byMonth[mk].omset      += e.buyer_total_amount;
     byMonth[mk].net         += e.escrow_amount;
-    byMonth[mk].hpp         += calcOrderHpp(order);
-    byMonth[mk].commission += e.commission_fee;
+    byMonth[mk].hpp         += isRetur ? 0 : calcOrderHpp(order);
+    byMonth[mk].commission  += e.commission_fee;
     byMonth[mk].service     += e.service_fee;
     byMonth[mk].orders++;
+
+    if (isRetur) {
+      byMonth[mk].omsetMinus += e.buyer_total_amount;
+      byMonth[mk].netMinus   += e.escrow_amount;
+      byMonth[mk].orderMinus++;
+    } else {
+      byMonth[mk].omsetPlus  += e.buyer_total_amount;
+      byMonth[mk].netPlus    += e.escrow_amount;
+      byMonth[mk].orderPlus++;
+    }
   });
 
   S.monthlyFinanceData = Object.values(byMonth).map(m => ({
     ...m,
     profit: m.net - m.hpp,
-    margin: m.omset > 0 ? ((m.net-m.hpp)/m.omset*100) : 0
+    margin: m.omsetPlus > 0 ? ((m.net-m.hpp)/m.omsetPlus*100) : 0
   }));
 
   renderFinanceTableRows();
@@ -1628,7 +1646,9 @@ function renderFinanceTableRows() {
                              (S.month !== 'all' && parseInt(mo) === parseInt(S.month) && parseInt(y) === S.year);
     return `<tr style="${isCurrentFilter ? 'background:#f0fdf4' : ''}">
       <td style="font-weight:700">${monthName} ${y}</td>
-      <td style="text-align:right">${fmtRp(m.omset)}</td>
+      <td style="text-align:right;color:#059669;font-weight:600">${fmtRp(m.omsetPlus||0)}<div style="font-size:10px;color:#9ca3af">${m.orderPlus||0} order</div></td>
+      <td style="text-align:right;color:#dc2626">${m.omsetMinus ? fmtRp(m.omsetMinus) : '—'}<div style="font-size:10px;color:#9ca3af">${m.orderMinus||0} retur</div></td>
+      <td style="text-align:right;font-weight:600">${fmtRp(m.omset)}</td>
       <td style="text-align:right;font-weight:700;color:#059669">${fmtRp(m.net)}</td>
       <td style="text-align:right;color:#dc2626">${hasHpp ? fmtRp(m.hpp) : '—'}</td>
       <td style="text-align:right;font-weight:800;color:#0891b2;background:#ecfeff66">${hasHpp ? fmtRp(m.profit) : '—'}</td>
@@ -1652,8 +1672,15 @@ function renderFinanceTableRows() {
   const totalOrders = sorted.reduce((s,m)=>s+m.orders,0);
   const totalMargin = totalOmset>0 ? (totalProfit/totalOmset*100).toFixed(1) : 0;
 
+  const totalOmsetPlus  = sorted.reduce((s,m)=>s+(m.omsetPlus||0),0);
+  const totalOmsetMinus = sorted.reduce((s,m)=>s+(m.omsetMinus||0),0);
+  const totalOrderPlus  = sorted.reduce((s,m)=>s+(m.orderPlus||0),0);
+  const totalOrderMinus = sorted.reduce((s,m)=>s+(m.orderMinus||0),0);
+
   tbody.innerHTML += `<tr style="border-top:2px solid #e5e7eb;font-weight:800;background:#fafafa">
     <td>TOTAL</td>
+    <td style="text-align:right;color:#059669">${fmtRp(totalOmsetPlus)}<div style="font-size:10px;font-weight:400;color:#9ca3af">${totalOrderPlus} order</div></td>
+    <td style="text-align:right;color:#dc2626">${totalOmsetMinus ? fmtRp(totalOmsetMinus) : '—'}<div style="font-size:10px;font-weight:400;color:#9ca3af">${totalOrderMinus} retur</div></td>
     <td style="text-align:right">${fmtRp(totalOmset)}</td>
     <td style="text-align:right;color:#059669">${fmtRp(totalNet)}</td>
     <td style="text-align:right;color:#dc2626">${hasHpp ? fmtRp(totalHpp) : '—'}</td>
